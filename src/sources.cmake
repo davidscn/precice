@@ -185,6 +185,8 @@ target_sources(precice
     src/mapping/NearestNeighborMapping.hpp
     src/mapping/NearestProjectionMapping.cpp
     src/mapping/NearestProjectionMapping.hpp
+    src/mapping/Partition.hpp
+    src/mapping/PartitionOfUnityMapping.hpp
     src/mapping/PetRadialBasisFctMapping.hpp
     src/mapping/Polation.cpp
     src/mapping/Polation.hpp

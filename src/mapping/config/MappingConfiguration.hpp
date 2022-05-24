@@ -126,6 +126,9 @@ private:
   const std::string ATTR_Z_DEAD         = "z-dead";
   const std::string ATTR_USE_QR         = "use-qr-decomposition";
 
+  const std::string ATTR_VERTICES_PER_PARTITION = "vertices-per-partition";
+  const std::string ATTR_RELATIVE_OVERLAP       = "relative-overlap";
+
   const std::string VALUE_WRITE             = "write";
   const std::string VALUE_READ              = "read";
   const std::string VALUE_CONSISTENT        = "consistent";
@@ -144,6 +147,7 @@ private:
   const std::string VALUE_RBF_CTPS_C2           = "rbf-compact-tps-c2";
   const std::string VALUE_RBF_CPOLYNOMIAL_C0    = "rbf-compact-polynomial-c0";
   const std::string VALUE_RBF_CPOLYNOMIAL_C6    = "rbf-compact-polynomial-c6";
+  const std::string VALUE_RBF_POU               = "rbf-pou";
 
   const std::string VALUE_NEAREST_NEIGHBOR_GRADIENT = "nearest-neighbor-gradient";
 
@@ -170,7 +174,9 @@ private:
       bool                             zDead,
       bool                             useLU,
       Polynomial                       polynomial,
-      Preallocation                    preallocation) const;
+      Preallocation                    preallocation,
+      double                           verticesPerPartition,
+      double                           relativeOverlap) const;
 
   /// Check whether a mapping to and from the same mesh already exists
   void checkDuplicates(const ConfiguredMapping &mapping);
