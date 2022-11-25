@@ -3,6 +3,8 @@
 #include <Eigen/Core>
 #include <numeric>
 
+#include <boost/range/irange.hpp>
+#include "RadialBasisFctSolver.hpp"
 #include "com/Communication.hpp"
 #include "io/ExportVTU.hpp"
 #include "mapping/CreatePartitioning.hpp"
@@ -78,6 +80,11 @@ private:
 
   Polynomial _polynomial;
 
+  /// Decomposition of the polynomial (for separate polynomial)
+  Eigen::ColPivHouseholderQR<Eigen::MatrixXd> _qrMatrixQ;
+
+  Eigen::MatrixXd _matrixQ;
+  Eigen::MatrixXd _matrixV;
   // Holds the output vertex -> partition association. Outer vector has the size of the output mesh and inner vector size of the associated partitions
   std::vector<std::vector<VertexID>> _partMap;
 
@@ -200,7 +207,7 @@ void PartitionOfUnityMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
     // We cannot simply take the vertex from the container, as the ID needs to match the partition ID
     // That's required for the indexing and asserted below
     mesh::Vertex                       center(c.getCoords(), meshVertices.size());
-    Partition<RADIAL_BASIS_FUNCTION_T> p(inMesh->getDimensions(), center, averagePartitionRadius, _parameter, _deadAxis, _polynomial, _verticesPerPartition, inMesh, outMesh);
+    Partition<RADIAL_BASIS_FUNCTION_T> p(inMesh->getDimensions(), center, averagePartitionRadius, _parameter, _deadAxis, Polynomial::OFF, _verticesPerPartition, inMesh, outMesh);
 
     // Consider only non-empty partitions
     if (!p.isEmpty()) {
@@ -242,10 +249,10 @@ void PartitionOfUnityMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   // Consistency check
   PRECICE_ASSERT(_partMap.size() == outMesh->vertices().size());
 
-// Add a VTK export for visualization purposes
-#ifndef NDEBUG
+  // Add a VTK export for visualization purposes
+  // #ifndef NDEBUG
   exportPartitionCentersAsVTU(centerMesh);
-#endif
+  // #endif
 
   // Compute the weigths
   precice::utils::Event e_exec("map.pou.computeMapping.computeWeights", precice::syncMode);
@@ -278,6 +285,23 @@ void PartitionOfUnityMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
     for (unsigned int i = 0; i < partitionIDs.size(); ++i) {
       _partitions[partitionIDs[i]].setNormalizedWeight(weights[i] / weightSum, vertex.getID());
     }
+  }
+
+  if (_polynomial == Polynomial::SEPARATE) {
+
+    std::array<bool, 3> activeAxis({{true, true, true}});
+    // 1. Allocate memory for these matrices
+    // 4 = 1 + dimensions(3) = maximum number of polynomial parameters
+    const unsigned int polyParams = 4 - std::count(activeAxis.begin(), activeAxis.end(), false);
+    _matrixQ.resize(inMesh->vertices().size(), polyParams);
+    _matrixV.resize(outMesh->vertices().size(), polyParams);
+
+    // 2. fill the matrices: Q for the inputMesh, V for the outputMesh
+    fillPolynomialEntries(_matrixQ, *inMesh, boost::irange<Eigen::Index>(0, inMesh->vertices().size()), 0, activeAxis);
+    fillPolynomialEntries(_matrixV, *outMesh, boost::irange<Eigen::Index>(0, outMesh->vertices().size()), 0, activeAxis);
+
+    // 3. compute decomposition
+    _qrMatrixQ = _matrixQ.colPivHouseholderQr();
   }
 
   // Set the computedMapping flag
@@ -326,11 +350,24 @@ void PartitionOfUnityMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(DataID inpu
 
   // 1. Reset the output data values as we need to accumulate data across partitions later on
   output()->data(outputDataID)->values().setZero();
+  auto invalues = input()->data(inputDataID)->values();
+
+  Eigen::VectorXd polynomialContribution;
+  // Solve polynomial QR and subtract it from the input data
+  if (_polynomial == Polynomial::SEPARATE) {
+    polynomialContribution = _qrMatrixQ.solve(input()->data(inputDataID)->values());
+    input()->data(inputDataID)->values() -= (_matrixQ * polynomialContribution);
+  }
 
   // 2. Execute the actual mapping evaluation in all partitions and acccumulate the data
   std::for_each(_partitions.begin(), _partitions.end(), [&](auto &p) { p.mapConsistent(input()->data(inputDataID),
                                                                                        output()->data(outputDataID)); });
 
+  // Add the polynomial part again for separated polynomial
+  if (_polynomial == Polynomial::SEPARATE) {
+    output()->data(outputDataID)->values() += (_matrixV * polynomialContribution);
+  }
+  input()->data(inputDataID)->values() = invalues;
   // Set mapping finished
   std::for_each(_partitions.begin(), _partitions.end(), [&](auto &p) { p.setMappingFinished(); });
 }

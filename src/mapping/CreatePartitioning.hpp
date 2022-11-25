@@ -349,7 +349,7 @@ inline std::tuple<double, Vertices> createUniformBlockPartitioning(mesh::PtrMesh
     }
   }
 
-  tagEmptyPartitions(averagePartitionRadius, centers, inMesh, 0.2 * verticesPerPartition);
+  tagEmptyPartitions(averagePartitionRadius, centers, inMesh, 0.0 * verticesPerPartition);
   tagEmptyPartitions(averagePartitionRadius, centers, outMesh, 0U);
   PRECICE_DEBUG("Number of non-tagged centers after empty partitions were filtered: {}", std::count_if(centers.begin(), centers.end(), [](auto &v) { return !v.isTagged(); }));
   if (projectPartitionsToInput) {

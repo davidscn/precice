@@ -79,6 +79,31 @@ inline double computeSquaredDifference(
   return std::accumulate(v.begin(), v.end(), static_cast<double>(0.), [](auto &res, auto &val) { return res + val * val; });
 }
 
+/// computes dead axis in case we want to explot polynomials
+template <typename IndexContainer>
+std::array<bool, 3> computeActiveAxis(const mesh::Mesh &mesh, const IndexContainer &IDs, std::array<bool, 3> axis)
+{
+  constexpr double threshold = 5e-3;
+
+  for (unsigned int d = 0; d < axis.size(); ++d) {
+
+    // We don't set user-defined dead axis to true
+    if (axis[d] == false)
+      continue;
+
+    // In 95% of the cases, the active axis remain active and we don't need to go tthrough the whole array
+    // therefore, we perform a random sampling between the first and the last vertex here
+    if (std::abs(mesh.vertices()[*IDs.begin()].rawCoords()[d] - mesh.vertices()[*(IDs.begin() + IDs.size() - 1)].rawCoords()[d]) > threshold)
+      continue;
+
+    // If the random sampling was not succesfull, we check the whole array
+    auto res = std::minmax_element(IDs.begin(), IDs.end(), [&](const auto &a, const auto &b) { return mesh.vertices()[a].rawCoords()[d] < mesh.vertices()[b].rawCoords()[d]; });
+    // Check if we are above or below the threshold
+    axis[d] = std::abs(mesh.vertices()[*res.second].rawCoords()[d] - mesh.vertices()[*res.first].rawCoords()[d]) > threshold;
+  }
+  return axis;
+}
+
 // Fill in the polynomial entries
 template <typename IndexContainer>
 inline void fillPolynomialEntries(Eigen::MatrixXd &matrix, const mesh::Mesh &mesh, const IndexContainer &IDs, Eigen::Index startIndex, std::array<bool, 3> activeAxis)

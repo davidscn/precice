@@ -980,18 +980,18 @@ BOOST_AUTO_TEST_CASE(PartitionOfUnityMappingTests)
   perform2DTestConsistentMapping(consistentMap2D);
   mapping::PartitionOfUnityMapping<CompactPolynomialC0> consistentMap2DVector(Mapping::CONSISTENT, 2, 3., Polynomial::SEPARATE, 5, 0.4, false);
   perform2DTestConsistentMappingVector(consistentMap2DVector);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap2D(Mapping::CONSERVATIVE, 2, 3., Polynomial::SEPARATE, 5, 0.4, false);
-  perform2DTestConservativeMapping(conservativeMap2D);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap2DVector(Mapping::CONSERVATIVE, 2, 3., Polynomial::SEPARATE, 5, 0.4, false);
-  perform2DTestConservativeMappingVector(conservativeMap2DVector);
+  // mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap2D(Mapping::CONSERVATIVE, 2, 3., Polynomial::SEPARATE, 5, 0.4, false);
+  // perform2DTestConservativeMapping(conservativeMap2D);
+  // mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap2DVector(Mapping::CONSERVATIVE, 2, 3., Polynomial::SEPARATE, 5, 0.4, false);
+  // perform2DTestConservativeMappingVector(conservativeMap2DVector);
   mapping::PartitionOfUnityMapping<CompactPolynomialC0> consistentMap3D(Mapping::CONSISTENT, 3, 3., Polynomial::SEPARATE, 5, 0.4, false);
   perform3DTestConsistentMapping(consistentMap3D);
   mapping::PartitionOfUnityMapping<CompactPolynomialC0> consistentMap3DVector(Mapping::CONSISTENT, 3, 3., Polynomial::SEPARATE, 5, 0.4, false);
   perform3DTestConsistentMappingVector(consistentMap3DVector);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3D(Mapping::CONSERVATIVE, 3, 3., Polynomial::SEPARATE, 5, 0.4, false);
-  perform3DTestConservativeMapping(conservativeMap3D);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3DVector(Mapping::CONSERVATIVE, 3, 3., Polynomial::SEPARATE, 5, 0.4, false);
-  perform3DTestConservativeMappingVector(conservativeMap3DVector);
+  // mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3D(Mapping::CONSERVATIVE, 3, 3., Polynomial::SEPARATE, 5, 0.4, false);
+  // perform3DTestConservativeMapping(conservativeMap3D);
+  // mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3DVector(Mapping::CONSERVATIVE, 3, 3., Polynomial::SEPARATE, 5, 0.4, false);
+  // perform3DTestConservativeMappingVector(conservativeMap3DVector);
 }
 
 BOOST_AUTO_TEST_SUITE_END() // Serial
@@ -1123,43 +1123,43 @@ void testDistributed(const TestContext &    context,
   BOOST_TEST(outData->values().size() == index * valueDimension);
 }
 
-BOOST_AUTO_TEST_CASE(DistributedConsistent2D)
-{
-  PRECICE_TEST(""_on(4_ranks).setupIntraComm());
-  std::vector<int> globalIndexOffsets = {0, 0, 0, 0};
+// BOOST_AUTO_TEST_CASE(DistributedConsistent2D)
+// {
+//   PRECICE_TEST(""_on(4_ranks).setupIntraComm());
+//   std::vector<int> globalIndexOffsets = {0, 0, 0, 0};
 
-  MeshSpecification in{// Consistent mapping: The inMesh is communicated
-                       {-1, 0, {0, 0}, {1}},
-                       {-1, 0, {0, 1}, {2}},
-                       {-1, 1, {1, 0}, {3}},
-                       {-1, 1, {1, 1}, {4}},
-                       {-1, 2, {2, 0}, {5}},
-                       {-1, 2, {2, 1}, {6}},
-                       {-1, 3, {3, 0}, {7}},
-                       {-1, 3, {3, 1}, {8}}};
-  MeshSpecification out{// The outMesh is local, distributed among all ranks
-                        {0, -1, {0, 0}, {0}},
-                        {0, -1, {0, 1}, {0}},
-                        {1, -1, {1, 0}, {0}},
-                        {1, -1, {1, 1}, {0}},
-                        {2, -1, {2, 0}, {0}},
-                        {2, -1, {2, 1}, {0}},
-                        {3, -1, {3, 0}, {0}},
-                        {3, -1, {3, 1}, {0}}};
+//   MeshSpecification in{// Consistent mapping: The inMesh is communicated
+//                        {-1, 0, {0, 0}, {1}},
+//                        {-1, 0, {0, 1}, {2}},
+//                        {-1, 1, {1, 0}, {3}},
+//                        {-1, 1, {1, 1}, {4}},
+//                        {-1, 2, {2, 0}, {5}},
+//                        {-1, 2, {2, 1}, {6}},
+//                        {-1, 3, {3, 0}, {7}},
+//                        {-1, 3, {3, 1}, {8}}};
+//   MeshSpecification out{// The outMesh is local, distributed among all ranks
+//                         {0, -1, {0, 0}, {0}},
+//                         {0, -1, {0, 1}, {0}},
+//                         {1, -1, {1, 0}, {0}},
+//                         {1, -1, {1, 1}, {0}},
+//                         {2, -1, {2, 0}, {0}},
+//                         {2, -1, {2, 1}, {0}},
+//                         {3, -1, {3, 0}, {0}},
+//                         {3, -1, {3, 1}, {0}}};
 
-  ReferenceSpecification ref{// Tests for {0, 1} on the first rank, {1, 2} on the second, ...
-                             {0, {1}},
-                             {0, {2}},
-                             {1, {3}},
-                             {1, {4}},
-                             {2, {5}},
-                             {2, {6}},
-                             {3, {7}},
-                             {3, {8}}};
+//   ReferenceSpecification ref{// Tests for {0, 1} on the first rank, {1, 2} on the second, ...
+//                              {0, {1}},
+//                              {0, {2}},
+//                              {1, {3}},
+//                              {1, {4}},
+//                              {2, {5}},
+//                              {2, {6}},
+//                              {3, {7}},
+//                              {3, {8}}};
 
-  mapping::PartitionOfUnityMapping<CompactPolynomialC6> consistentMap2D(Mapping::CONSISTENT, 2, 3., Polynomial::SEPARATE, 5, 0.3, false);
-  testDistributed(context, consistentMap2D, in, out, ref, globalIndexOffsets.at(context.rank));
-}
+// mapping::PartitionOfUnityMapping<CompactPolynomialC6> consistentMap2D(Mapping::CONSISTENT, 2, 3., Polynomial::SEPARATE, 5, 0.3, false);
+// testDistributed(context, consistentMap2D, in, out, ref, globalIndexOffsets.at(context.rank));
+// }
 
 BOOST_AUTO_TEST_SUITE_END() // Parallel
 

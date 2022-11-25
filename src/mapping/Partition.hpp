@@ -140,7 +140,7 @@ Partition<RADIAL_BASIS_FUNCTION_T>::Partition(
 
   // If we have only very few vertices (10% of the target), we consider this partition as empty
   // TODO: The second empty criterion is potentially not suitable for conservative mappings
-  _emptyPartition = outIDs.size() == 0 || inIDs.size() < 0.1 * targetSize;
+  _emptyPartition = outIDs.size() == 0 || inIDs.size() == 0;
 
   if (_emptyPartition) {
     return;
