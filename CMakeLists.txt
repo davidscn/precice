@@ -55,6 +55,7 @@ endif()
 
 option(PRECICE_MPICommunication "Enables MPI-based communication and running coupling tests." ON)
 option(PRECICE_PETScMapping "Enable use of the PETSc linear algebra library." ON)
+option(PRECICE_GinkgoParallelization "Enable use of the Ginkgo linear algebra library for parallelization." ON)
 option(PRECICE_PythonActions "Python support" ON)
 option(PRECICE_Packages "Configure package generation." ON)
 option(BUILD_SHARED_LIBS "Build shared instead of static libraries" ON)
@@ -227,6 +228,32 @@ else()
   message(STATUS "PETSc support disabled")
 endif()
 
+# Option: Ginkgo
+if (PRECICE_GinkgoParallelization)
+
+  # Check if CUDA is available on the system
+  include(CheckLanguage)
+  check_language(CUDA)
+
+  # Enable CUDA if driver and libraries are available; otherwise it'll be ignored
+  if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    set(CMAKE_CUDA_FLAGS "--allow-unsupported-compiler --std=c++17 --expt-extended-lambda --expt-relaxed-constexpr -Xcompiler -fopenmp -Wall")
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+
+  endif()
+
+  # Check if OpenMP is available
+  find_package(OpenMP)
+  if(OpenMP_FOUND)
+    set(CMAKE_CXX_FLAGS "-fopenmp")
+  endif()
+
+endif()
+
 # Option Python
 if (PRECICE_PythonActions)
   find_package(Python3 REQUIRED COMPONENTS Development NumPy)
@@ -318,6 +345,30 @@ if (PRECICE_PETScMapping AND PRECICE_MPICommunication)
   target_link_libraries(preciceCore PUBLIC PETSc::PETSc)
 else()
   target_compile_definitions(preciceCore PUBLIC PRECICE_NO_PETSC)
+endif()
+
+# Setup Ginkgo
+if (PRECICE_GinkgoParallelization)
+  set(CMAKE_CXX_FLAGS "-fPIC")
+  set(Ginkgo_Path "" CACHE STRING "Path to the experimental Ginkgo Repository of branch a195f856e.") # TODO: Remove as soon as GPU feature is in main branch
+  find_package(Ginkgo REQUIRED HINTS "${Ginkgo_Path}/build" NO_CMAKE_SYSTEM_PATH)
+  target_include_directories(preciceCore PUBLIC "${Ginkgo_Path}/include")
+  include(${Ginkgo_Path}/cmake/unified_kernels.cmake)
+  file(GLOB ginkgo_lib "${Ginkgo_Path}/build/lib/*")
+  target_link_libraries(preciceCore PUBLIC ${ginkgo_lib})
+  # This command registers Ginkgo kernels for different execution backends
+  ginkgo_add_unified_kernels(preciceCore src/mapping/ginkgo_kernels/GinkgoRBFKernels.cpp)
+
+  if(CMAKE_CUDA_COMPILER)
+    target_link_libraries(preciceCore PUBLIC cublas cusolver)
+    target_sources(preciceCore PRIVATE src/mapping/impl/DeviceBasisFunctions.cu)
+  else()
+    # We need to pass specific files to the host compiler instead; we do this by changing the file ending
+    file(COPY_FILE src/mapping/impl/DeviceBasisFunctions.cu src/mapping/impl/DeviceBasisFunctions.cpp)
+    target_sources(preciceCore PRIVATE src/mapping/impl/DeviceBasisFunctions.cpp)
+  endif()
+else()
+  target_compile_definitions(preciceCore PUBLIC PRECICE_NO_GINKGO)
 endif()
 
 # Option Python
