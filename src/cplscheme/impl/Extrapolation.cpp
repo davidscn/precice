@@ -4,9 +4,7 @@
 #include "logging/LogMacros.hpp"
 #include "utils/EigenHelperFunctions.hpp"
 
-namespace precice {
-namespace cplscheme {
-namespace impl {
+namespace precice::cplscheme::impl {
 
 Extrapolation::Extrapolation(
     const int extrapolationOrder)
@@ -63,7 +61,7 @@ int Extrapolation::valuesSize()
 
 /**
  * @brief Computes which order may be used for extrapolation.
- * 
+ *
  * Order of extrapolation is determined by number of stored samples and maximum order defined by the user.
  * Example: If only two samples are available, the maximum order we may use is 1, even if the user demands order 2.
  *
@@ -106,23 +104,12 @@ Eigen::VectorXd Extrapolation::extrapolate()
     return _timeWindowsStorage.col(0);
   }
   Eigen::VectorXd extrapolatedValue;
-  if (usedOrder == 1) { //timesteps is increased before extrapolate is called
-    PRECICE_DEBUG("Performing first order extrapolation");
-    PRECICE_ASSERT(_numberOfStoredSamples > 1);
-    extrapolatedValue = _timeWindowsStorage.col(0) * 2.0; // = 2*x^t
-    extrapolatedValue -= _timeWindowsStorage.col(1);      // = 2*x^t - x^(t-1)
-    return extrapolatedValue;
-  }
-  PRECICE_ASSERT(usedOrder == 2);
-  // uses formula given in https://doi.org/10.1016/j.compstruc.2008.11.013, p.796, Algorithm line 1
-  PRECICE_DEBUG("Performing second order extrapolation");
-  PRECICE_ASSERT(_numberOfStoredSamples > 2);
-  extrapolatedValue = _timeWindowsStorage.col(0) * 2.5;  // = 2.5*x^t
-  extrapolatedValue -= _timeWindowsStorage.col(1) * 2.0; // = 2.5*x^t - 2*x^(t-1)
-  extrapolatedValue += _timeWindowsStorage.col(2) * 0.5; // = 2.5*x^t - 2*x^(t-1) + 0.5*x^(t-2)
+  PRECICE_ASSERT(usedOrder == 1);
+  PRECICE_DEBUG("Performing first order extrapolation");
+  PRECICE_ASSERT(_numberOfStoredSamples > 1);
+  extrapolatedValue = _timeWindowsStorage.col(0) * 2.0; // = 2*x^t
+  extrapolatedValue -= _timeWindowsStorage.col(1);      // = 2*x^t - x^(t-1)
   return extrapolatedValue;
 }
 
-} // namespace impl
-} // namespace cplscheme
-} // namespace precice
+} // namespace precice::cplscheme::impl

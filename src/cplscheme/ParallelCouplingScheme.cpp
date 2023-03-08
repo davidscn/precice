@@ -5,8 +5,7 @@
 #include "cplscheme/BiCouplingScheme.hpp"
 #include "logging/LogMacros.hpp"
 
-namespace precice {
-namespace cplscheme {
+namespace precice::cplscheme {
 
 ParallelCouplingScheme::ParallelCouplingScheme(
     double                        maxTime,
@@ -24,62 +23,43 @@ ParallelCouplingScheme::ParallelCouplingScheme(
     : BiCouplingScheme(maxTime, maxTimeWindows, timeWindowSize, validDigits, firstParticipant,
                        secondParticipant, localParticipant, std::move(m2n), maxIterations, cplMode, dtMethod, extrapolationOrder) {}
 
-void ParallelCouplingScheme::initializeImplementation()
+void ParallelCouplingScheme::exchangeFirstData()
 {
-  determineInitialSend(getSendData());
-  determineInitialReceive(getReceiveData());
-}
-
-void ParallelCouplingScheme::exchangeInitialData()
-{
-  // F: send, receive, S: receive, send
-  if (doesFirstStep()) {
-    if (sendsInitializedData()) {
-      sendData(getM2N(), getSendData());
-    }
-    if (receivesInitializedData()) {
-      receiveData(getM2N(), getReceiveData());
-      checkInitialDataHasBeenReceived();
-    }
+  if (doesFirstStep()) { // first participant
+    PRECICE_DEBUG("Sending data...");
+    sendData(getM2N(), getSendData());
   } else { // second participant
-    if (receivesInitializedData()) {
-      receiveData(getM2N(), getReceiveData());
-      checkInitialDataHasBeenReceived();
-    }
-    if (sendsInitializedData()) {
-      sendData(getM2N(), getSendData());
-    }
+    PRECICE_DEBUG("Receiving data...");
+    receiveData(getM2N(), getReceiveData());
+    checkDataHasBeenReceived();
   }
 }
 
-bool ParallelCouplingScheme::exchangeDataAndAccelerate()
+void ParallelCouplingScheme::exchangeSecondData()
 {
-  bool convergence = true;
-
-  if (doesFirstStep()) { //first participant
-    PRECICE_DEBUG("Sending data...");
-    sendData(getM2N(), getSendData());
+  if (doesFirstStep()) { // first participant
     PRECICE_DEBUG("Receiving data...");
     if (isImplicitCouplingScheme()) {
-      convergence = receiveConvergence(getM2N());
+      receiveConvergence(getM2N());
     }
     receiveData(getM2N(), getReceiveData());
     checkDataHasBeenReceived();
-  } else { //second participant
-    PRECICE_DEBUG("Receiving data...");
-    receiveData(getM2N(), getReceiveData());
-    checkDataHasBeenReceived();
+  } else { // second participant
     if (isImplicitCouplingScheme()) {
       PRECICE_DEBUG("Perform acceleration (only second participant)...");
-      convergence = doImplicitStep();
-      sendConvergence(getM2N(), convergence);
+      doImplicitStep();
+      sendConvergence(getM2N());
     }
     PRECICE_DEBUG("Sending data...");
     sendData(getM2N(), getSendData());
   }
-
-  return convergence;
 }
 
-} // namespace cplscheme
-} // namespace precice
+const DataMap ParallelCouplingScheme::getAccelerationData()
+{
+  // ParallelCouplingScheme applies acceleration to all CouplingData
+  PRECICE_ASSERT(!doesFirstStep(), "Only the second participant should do the acceleration.");
+  return _allData;
+}
+
+} // namespace precice::cplscheme

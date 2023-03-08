@@ -28,15 +28,7 @@ void testMappingVolumeOneTriangle(const std::string configFile, const TestContex
     BOOST_TEST(vertexIDs[1] != -1, "Vertex B is invalid");
     BOOST_TEST(vertexIDs[2] != -1, "Vertex C is invalid");
 
-    int edgeAB = interface.setMeshEdge(meshID, vertexIDs[0], vertexIDs[1]);
-    int edgeBC = interface.setMeshEdge(meshID, vertexIDs[1], vertexIDs[2]);
-    int edgeCA = interface.setMeshEdge(meshID, vertexIDs[2], vertexIDs[0]);
-
-    BOOST_TEST(edgeAB != -1, "Edge AB is invalid");
-    BOOST_TEST(edgeBC != -1, "Edge BC is invalid");
-    BOOST_TEST(edgeCA != -1, "Edge CA is invalid");
-
-    interface.setMeshTriangle(meshID, edgeAB, edgeBC, edgeCA);
+    interface.setMeshTriangle(meshID, vertexIDs[0], vertexIDs[1], vertexIDs[2]);
 
     BOOST_CHECK(interface.getMeshVertexSize(meshID) == 3);
 
@@ -138,15 +130,7 @@ void testMappingVolumeOneTriangleConservative(const std::string configFile, cons
 
     interface.setMeshVertices(meshID, vertexIDs.size(), coords.data(), vertexIDs.data());
 
-    int edgeAB = interface.setMeshEdge(meshID, vertexIDs[0], vertexIDs[1]);
-    int edgeBC = interface.setMeshEdge(meshID, vertexIDs[1], vertexIDs[2]);
-    int edgeCA = interface.setMeshEdge(meshID, vertexIDs[2], vertexIDs[0]);
-
-    BOOST_TEST(edgeAB != -1, "Edge AB is invalid");
-    BOOST_TEST(edgeBC != -1, "Edge BC is invalid");
-    BOOST_TEST(edgeCA != -1, "Edge CA is invalid");
-
-    interface.setMeshTriangle(meshID, edgeAB, edgeBC, edgeCA);
+    interface.setMeshTriangle(meshID, vertexIDs[0], vertexIDs[1], vertexIDs[2]);
 
     // Initialize, read data, advance and finalize. Check expected mapping
     double dt = interface.initialize();
@@ -202,14 +186,17 @@ void testMappingVolumeOneTetra(const std::string configFile, const TestContext &
     auto &mesh = precice::testing::WhiteboxAccessor::impl(interface).mesh("MeshOne");
     // setMeshTetrahedron currently adds underlying connectivity
     BOOST_REQUIRE(mesh.vertices().size() == 4);
-    BOOST_REQUIRE(mesh.edges().size() == 6);
-    BOOST_REQUIRE(mesh.triangles().size() == 4);
+    BOOST_REQUIRE(mesh.edges().empty());
+    BOOST_REQUIRE(mesh.triangles().empty());
     BOOST_REQUIRE(mesh.tetrahedra().size() == 1);
 
     BOOST_TEST(equals(mesh.tetrahedra()[0].getVolume(), 1.0 / 6), "Tetrahedron volume must be 1/6");
 
     // Initialize, write data, advance and finalize
     double dt = interface.initialize();
+    BOOST_REQUIRE(mesh.edges().size() == 6);
+    BOOST_REQUIRE(mesh.triangles().size() == 4);
+    BOOST_REQUIRE(mesh.tetrahedra().size() == 1);
     BOOST_TEST(!mesh.tetrahedra().empty(), "Tetrahedra must still be stored");
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant must advance once.");
 
@@ -311,14 +298,17 @@ void testMappingVolumeOneTetraConservative(const std::string configFile, const T
     auto &mesh = precice::testing::WhiteboxAccessor::impl(interface).mesh("MeshTwo");
     // setMeshTetrahedron currently adds underlying connectivity
     BOOST_REQUIRE(mesh.vertices().size() == 4);
-    BOOST_REQUIRE(mesh.edges().size() == 6);
-    BOOST_REQUIRE(mesh.triangles().size() == 4);
+    BOOST_REQUIRE(mesh.edges().empty());
+    BOOST_REQUIRE(mesh.triangles().empty());
     BOOST_REQUIRE(mesh.tetrahedra().size() == 1);
 
     BOOST_TEST(equals(mesh.tetrahedra()[0].getVolume(), 1.0 / 6), "Tetrahedron volume must be 1/6");
 
     // Initialize, read data, advance and finalize. Check expected mapping
     double dt = interface.initialize();
+    BOOST_REQUIRE(mesh.edges().size() == 6);
+    BOOST_REQUIRE(mesh.triangles().size() == 4);
+    BOOST_REQUIRE(mesh.tetrahedra().size() == 1);
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant must advance once.");
 
     interface.advance(dt);

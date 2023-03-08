@@ -16,8 +16,7 @@
 #include "utils/IntraComm.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace acceleration {
+namespace precice::acceleration {
 
 AitkenAcceleration::AitkenAcceleration(double           initialRelaxation,
                                        std::vector<int> dataIDs)
@@ -37,11 +36,11 @@ void AitkenAcceleration::initialize(const DataMap &cplData)
   checkDataIDs(cplData);
   size_t entries = 0;
   if (_dataIDs.size() == 1) {
-    entries = cplData.at(_dataIDs.at(0))->values().size();
+    entries = cplData.at(_dataIDs.at(0))->getSize();
   } else {
     PRECICE_ASSERT(_dataIDs.size() == 2);
-    entries = cplData.at(_dataIDs.at(0))->values().size() +
-              cplData.at(_dataIDs.at(1))->values().size();
+    entries = cplData.at(_dataIDs.at(0))->getSize() +
+              cplData.at(_dataIDs.at(1))->getSize();
   }
   double          initializer = std::numeric_limits<double>::max();
   Eigen::VectorXd toAppend    = Eigen::VectorXd::Constant(entries, initializer);
@@ -85,16 +84,7 @@ void AitkenAcceleration::performAcceleration(
   PRECICE_DEBUG("AitkenFactor: {}", _aitkenFactor);
 
   // Perform relaxation with aitken factor
-  double omega         = _aitkenFactor;
-  double oneMinusOmega = 1.0 - omega;
-  for (const DataMap::value_type &pair : cplData) {
-    auto &      values    = pair.second->values();
-    const auto &oldValues = pair.second->previousIteration();
-    values *= omega;
-    for (int i = 0; i < values.size(); i++) {
-      values(i) += oldValues(i) * oneMinusOmega;
-    }
-  }
+  applyRelaxation(_aitkenFactor, cplData);
 
   // Store residuals for next iteration
   _residuals = residuals;
@@ -109,5 +99,4 @@ void AitkenAcceleration::iterationsConverged(
   _residuals        = Eigen::VectorXd::Constant(_residuals.size(), std::numeric_limits<double>::max());
 }
 
-} // namespace acceleration
-} // namespace precice
+} // namespace precice::acceleration

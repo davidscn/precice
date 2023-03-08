@@ -7,8 +7,8 @@
 #include <map>
 #include <numeric>
 #include <vector>
-#include "config/MappingConfiguration.hpp"
 #include "impl/BasisFunctions.hpp"
+#include "mapping/config/MappingConfigurationTypes.hpp"
 #include "math/math.hpp"
 #include "precice/impl/versions.hpp"
 #include "utils/Petsc.hpp"
@@ -67,22 +67,22 @@ public:
       Preallocation                  preallocation = Preallocation::TREE);
 
   /// Deletes the PETSc objects and the _deadAxis array
-  virtual ~PetRadialBasisFctMapping();
+  ~PetRadialBasisFctMapping() override;
 
   /// Computes the mapping coefficients from the in- and output mesh.
-  virtual void computeMapping() override;
+  void computeMapping() final override;
 
   /// Removes a computed mapping.
-  virtual void clear() override;
+  void clear() final override;
 
   friend struct MappingTests::PetRadialBasisFunctionMapping::Serial::SolutionCaching;
 
 private:
   /// @copydoc RadialBasisFctBaseMapping::mapConservative
-  virtual void mapConservative(DataID inputDataID, DataID outputDataID) override;
+  void mapConservative(DataID inputDataID, DataID outputDataID) final override;
 
   /// @copydoc RadialBasisFctBaseMapping::mapConsistent
-  virtual void mapConsistent(DataID inputDataID, DataID outputDataID) override;
+  void mapConsistent(DataID inputDataID, DataID outputDataID) final override;
 
   /// Stores col -> value for each row. Used to return the already computed values from the preconditioning
   using VertexData = std::vector<std::vector<std::pair<int, double>>>;
@@ -603,7 +603,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(DataID inp
   int const valueDim = this->input()->data(inputDataID)->getDimensions();
   PRECICE_ASSERT(valueDim == this->output()->data(outputDataID)->getDimensions(),
                  valueDim, this->output()->data(outputDataID)->getDimensions());
-  PRECICE_ASSERT(this->hasConstraint(Mapping::CONSISTENT) || this->hasConstraint(Mapping::SCALEDCONSISTENT));
+  PRECICE_ASSERT(this->hasConstraint(Mapping::CONSISTENT) || this->isScaledConsistent());
 
   auto out = petsc::Vector::allocate(_matrixA, "out");
   auto in  = petsc::Vector::allocate(_matrixC, "in");
@@ -859,8 +859,10 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::printMappingInfo(int inp
   std::string constraintName;
   if (this->hasConstraint(Mapping::CONSISTENT)) {
     constraintName = "consistent";
-  } else if (this->hasConstraint(Mapping::SCALEDCONSISTENT)) {
-    constraintName = "scaled-consistent";
+  } else if (this->hasConstraint(Mapping::SCALED_CONSISTENT_SURFACE)) {
+    constraintName = "scaled-consistent-surface";
+  } else if (this->hasConstraint(Mapping::SCALED_CONSISTENT_VOLUME)) {
+    constraintName = "scaled-consistent-volume";
   } else {
     constraintName = "conservative";
   }

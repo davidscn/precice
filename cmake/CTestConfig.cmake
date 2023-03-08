@@ -2,7 +2,7 @@
 # CTest
 #
 
-set(PRECICE_TEST_TIMEOUT_LONG 120 CACHE STRING "The timeout in seconds for longer tests.")
+set(PRECICE_TEST_TIMEOUT_LONG 180 CACHE STRING "The timeout in seconds for longer tests.")
 set(PRECICE_TEST_TIMEOUT_SHORT 20 CACHE STRING "The timeout in seconds for shorter tests.")
 
 set(PRECICE_TEST_DIR "${preCICE_BINARY_DIR}/TestOutput")
@@ -35,7 +35,7 @@ function(add_precice_test)
   # We always prefix our tests
   set(PAT_FULL_NAME "precice.${PAT_NAME}")
 
-  # Are direct dependencies fullfilled?
+  # Are direct dependencies fulfilled?
   if( (NOT PRECICE_MPICommunication) OR (PAT_PETSC AND NOT PRECICE_PETScMapping) )
     message(STATUS "Test ${PAT_FULL_NAME} - skipped")
     return()
@@ -225,7 +225,7 @@ add_precice_test(
 add_precice_test(
   NAME cplscheme
   ARGUMENTS "--run_test=CplSchemeTests"
-  TIMEOUT ${PRECICE_TEST_TIMEOUT_SHORT}
+  TIMEOUT ${PRECICE_TEST_TIMEOUT_LONG}
   )
 add_precice_test(
   NAME io

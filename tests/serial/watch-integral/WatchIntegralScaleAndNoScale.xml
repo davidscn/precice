@@ -2,7 +2,6 @@
 <precice-configuration>
   <solver-interface dimensions="2">
     <data:scalar name="DataOne" />
-    <data:scalar name="DataTwo" />
 
     <mesh name="MeshOne">
       <use-data name="DataOne" />
@@ -10,12 +9,11 @@
 
     <mesh name="MeshTwo">
       <use-data name="DataOne" />
-      <use-data name="DataTwo" />
     </mesh>
 
     <participant name="SolverOne">
-      <use-mesh name="MeshOne" provide="yes" />
-      <use-mesh name="MeshTwo" from="SolverTwo" />
+      <provide-mesh name="MeshOne" />
+      <receive-mesh name="MeshTwo" from="SolverTwo" />
       <mapping:nearest-projection
         direction="write"
         from="MeshOne"
@@ -25,8 +23,8 @@
     </participant>
 
     <participant name="SolverTwo">
-      <use-mesh name="MeshTwo" provide="yes" />
-      <read-data name="DataTwo" mesh="MeshTwo" />
+      <provide-mesh name="MeshTwo" />
+      <read-data name="DataOne" mesh="MeshTwo" />
       <watch-integral name="WatchIntegral" mesh="MeshTwo" scale-with-connectivity="yes" />
       <watch-integral name="WatchIntegralNoScale" mesh="MeshTwo" scale-with-connectivity="no" />
     </participant>

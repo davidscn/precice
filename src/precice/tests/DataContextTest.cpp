@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(testDataContextWriteMapping)
   ptrToMesh->createVertex(Eigen::Vector3d(1.0, 0.1, 0.0));
   ptrToMesh->createVertex(Eigen::Vector3d(0.0, 0.1, 1.0));
 
-  MeshContext toMeshContext(dimensions);
+  MeshContext toMeshContext;
   toMeshContext.mesh = ptrToMesh;
 
   WriteDataContext dataContext(ptrFromData, ptrFromMesh);
@@ -69,9 +69,7 @@ BOOST_AUTO_TEST_CASE(testDataContextWriteMapping)
   BOOST_TEST(!fixture.hasReadMapping(dataContext));
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].fromMeshID == mappingContext.fromMeshID);
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].toMeshID == mappingContext.toMeshID);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[0].hasMappedData == mappingContext.hasMappedData);
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].mapping == mappingContext.mapping);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[0].timing == mappingContext.timing);
 }
 
 BOOST_AUTO_TEST_CASE(testDataContextMultipleWriteMapping)
@@ -97,7 +95,7 @@ BOOST_AUTO_TEST_CASE(testDataContextMultipleWriteMapping)
   ptrToMesh->createVertex(Eigen::Vector3d(1.0, 0.1, 0.0));
   ptrToMesh->createVertex(Eigen::Vector3d(0.0, 0.1, 1.0));
 
-  MeshContext toMeshContext1(dimensions);
+  MeshContext toMeshContext1;
   toMeshContext1.mesh = ptrToMesh;
 
   WriteDataContext dataContext(ptrFromData, ptrFromMesh);
@@ -125,7 +123,7 @@ BOOST_AUTO_TEST_CASE(testDataContextMultipleWriteMapping)
   ptrToMesh2->createVertex(Eigen::Vector3d(2.0, 1.1, 0.0));
   ptrToMesh2->createVertex(Eigen::Vector3d(0.0, 2.1, 4.0));
 
-  MeshContext toMeshContext2(dimensions);
+  MeshContext toMeshContext2;
   toMeshContext2.mesh = ptrToMesh2;
 
   MappingContext mappingContext2;
@@ -148,9 +146,7 @@ BOOST_AUTO_TEST_CASE(testDataContextMultipleWriteMapping)
   BOOST_TEST(fixture.getToDataID(dataContext, 0) == ptrToData->getID());
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].fromMeshID == mappingContext.fromMeshID);
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].toMeshID == mappingContext.toMeshID);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[0].hasMappedData == mappingContext.hasMappedData);
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].mapping == mappingContext.mapping);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[0].timing == mappingContext.timing);
 
   // Now, test the newly added mapping
   BOOST_TEST(fixture.getProvidedDataID(dataContext) != ptrToData2->getID());
@@ -162,9 +158,7 @@ BOOST_AUTO_TEST_CASE(testDataContextMultipleWriteMapping)
   BOOST_TEST(fixture.getToDataID(dataContext, 1) == ptrToData2->getID());
   BOOST_TEST(fixture.mappingContexts(dataContext)[1].fromMeshID == mappingContext2.fromMeshID);
   BOOST_TEST(fixture.mappingContexts(dataContext)[1].toMeshID == mappingContext2.toMeshID);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[1].hasMappedData == mappingContext2.hasMappedData);
   BOOST_TEST(fixture.mappingContexts(dataContext)[1].mapping == mappingContext2.mapping);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[1].timing == mappingContext2.timing);
 }
 
 BOOST_AUTO_TEST_CASE(testDataContextReadMapping)
@@ -190,7 +184,7 @@ BOOST_AUTO_TEST_CASE(testDataContextReadMapping)
   ptrFromMesh->createVertex(Eigen::Vector3d(1.0, 0.1, 0.0));
   ptrFromMesh->createVertex(Eigen::Vector3d(0.0, 0.1, 1.0));
 
-  MeshContext fromMeshContext(dimensions);
+  MeshContext fromMeshContext;
   fromMeshContext.mesh = ptrFromMesh;
 
   ReadDataContext dataContext(ptrToData, ptrToMesh);
@@ -222,9 +216,7 @@ BOOST_AUTO_TEST_CASE(testDataContextReadMapping)
   BOOST_TEST(fixture.hasReadMapping(dataContext));
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].fromMeshID == mappingContext.fromMeshID);
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].toMeshID == mappingContext.toMeshID);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[0].hasMappedData == mappingContext.hasMappedData);
   BOOST_TEST(fixture.mappingContexts(dataContext)[0].mapping == mappingContext.mapping);
-  BOOST_TEST(fixture.mappingContexts(dataContext)[0].timing == mappingContext.timing);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

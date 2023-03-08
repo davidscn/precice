@@ -12,7 +12,7 @@ In order to get your contributions into the code base as smoothly as possible, p
 * Create a feature branch, based on `develop`, from where you want to base your work. For simplicity, prefix the branch name either with `add-` or `fix-`.
 * Make commits of logical units.  
   Write [good commit messages][commit].
-  Check for unnecessary whitespace with `git diff --check` before committing. 
+  Check for unnecessary whitespace with `git diff --check` before committing.
 * Write tests to assure your feature works as expected and prevent it from getting broken in the future.  
   See our example tests in `src/testing/tests/ExampleTests.cpp` and the [documentation of boost.test][boosttest] for more information.
 * Run _all_ the tests to assure nothing else accidentally broke.
@@ -33,5 +33,5 @@ Please contact the maintainers before integrating non-trivial amount of code fro
 [boosttest]: https://www.boost.org/doc/libs/1_65_1/libs/test/doc/html/index.html
 [commit]: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
 [pullrequest]: https://help.github.com/articles/creating-a-pull-request
-[style]: https://ipvs.informatik.uni-stuttgart.de/sgs/precice/docs/develop/conventions.html
-[workflow]: https://help.github.com/categories/collaborating-with-issues-and-pull-requests
+[style]: https://precice.org/dev-docs-dev-conventions.html
+[workflow]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests

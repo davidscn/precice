@@ -23,7 +23,6 @@
 #include "precice/types.hpp"
 #include "utils/IntraComm.hpp"
 #include "utils/ManageUniqueIDs.hpp"
-#include "utils/PointerVector.hpp"
 
 namespace precice {
 namespace impl {
@@ -83,10 +82,10 @@ public:
       int                  interpolationOrder);
 
   /// Adds a configured read \ref Mapping to the Participant
-  void addReadMappingContext(MappingContext *mappingContext);
+  void addReadMappingContext(const MappingContext &mappingContext);
 
   /// Adds a configured write \ref Mapping to the Participant
-  void addWriteMappingContext(MappingContext *mappingContext);
+  void addWriteMappingContext(const MappingContext &mappingContext);
 
   /// Adds a configured \ref WatchPoint to the Participant
   void addWatchPoint(const PtrWatchPoint &watchPoint);
@@ -94,7 +93,7 @@ public:
   /// Adds a configured \ref WatchIntegral to the Participant
   void addWatchIntegral(const PtrWatchIntegral &watchIntegral);
 
-  /// Sets weather the participant was configured with a master tag
+  /// Sets weather the participant was configured with a primary tag
   void setUsePrimaryRank(bool useIntraComm);
 
   /// Sets the manager responsible for providing unique IDs to meshes.
@@ -109,15 +108,15 @@ public:
   /// Adds a configured \ref ExportContext to export meshes and data.
   void addExportContext(const io::ExportContext &context);
 
-  /// Adds a mesh to be used by the participant.
-  void useMesh(const mesh::PtrMesh &                         mesh,
-               const Eigen::VectorXd &                       localOffset,
-               bool                                          remote,
-               const std::string &                           fromParticipant,
-               double                                        safetyFactor,
-               bool                                          provideMesh,
-               partition::ReceivedPartition::GeometricFilter geoFilter,
-               const bool                                    allowDirectAccess);
+  /// Adds a mesh to be provided by the participant.
+  void provideMesh(const mesh::PtrMesh &mesh);
+
+  /// Adds a mesh to be received by the participant.
+  void receiveMesh(const mesh::PtrMesh &                         mesh,
+                   const std::string &                           fromParticipant,
+                   double                                        safetyFactor,
+                   partition::ReceivedPartition::GeometricFilter geoFilter,
+                   const bool                                    allowDirectAccess);
   /// @}
 
   /// @name Data queries
@@ -131,6 +130,12 @@ public:
    * @pre there exists a \ref ReadDataContext for \ref dataID
    */
   ReadDataContext &readDataContext(DataID dataID);
+
+  /**
+   * Provides access to \ref ReadDataContext
+   * @pre there exists a \ref ReadDataContext for \ref dataName
+   */
+  ReadDataContext &readDataContext(const std::string &dataName);
 
   /** Provides access to \ref WriteDataContext
    * @pre there exists a \ref WriteDataContext for \ref dataID
@@ -257,11 +262,17 @@ public:
   /// Is a mesh with this id provided?
   bool isMeshProvided(MeshID meshID) const;
 
+  /// Is a mesh with this name provided by this participant?
+  bool isMeshProvided(const std::string &meshName) const;
+
+  /// Is a mesh with this name received by this participant?
+  bool isMeshReceived(const std::string &meshName) const;
+
   /// Get the used mesh id of a mesh with this name.
   int getUsedMeshID(const std::string &meshName) const;
 
   /// Returns whether we are allowed to access a received mesh direct
-  /// which requires the config tag <use-mesh ... direct-access="true"
+  /// which requires the config tag <receive-mesh ... direct-access="true"
   bool isDirectAccessAllowed(const int meshID) const;
 
   /// Get the name of a mesh given by its id.
@@ -296,14 +307,14 @@ public:
   /// Returns the name of the participant.
   const std::string &getName() const;
 
-  /// Returns true, if the participant uses a master tag.
+  /// Returns true, if the participant uses a primary tag.
   bool useIntraComm() const;
 
   /// Provided access to all read \ref MappingContext
-  const utils::ptr_vector<MappingContext> &readMappingContexts() const;
+  std::vector<MappingContext> &readMappingContexts();
 
   /// Provided access to all write \ref MappingContext
-  const utils::ptr_vector<MappingContext> &writeMappingContexts() const;
+  std::vector<MappingContext> &writeMappingContexts();
 
   /// Provided access to all \ref WatchPoints
   std::vector<PtrWatchPoint> &watchPoints();
@@ -339,10 +350,10 @@ private:
   std::vector<MeshContext *> _meshContexts; // @todo use map here!
 
   /// Read mapping contexts used by the participant.
-  utils::ptr_vector<MappingContext> _readMappingContexts;
+  std::vector<MappingContext> _readMappingContexts;
 
   /// Write mapping contexts used by the participant.
-  utils::ptr_vector<MappingContext> _writeMappingContexts;
+  std::vector<MappingContext> _writeMappingContexts;
 
   /// Mesh contexts used by the participant.
   std::vector<MeshContext *> _usedMeshContexts;

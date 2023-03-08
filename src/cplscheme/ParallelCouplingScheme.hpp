@@ -59,31 +59,11 @@ public:
 private:
   logging::Logger _log{"cplscheme::ParallelCouplingScheme"};
 
-  /**
-   * @brief Exchanges all data between the participants of the ParallelCouplingScheme and applies acceleration.
-   * @returns true, if iteration converged
-   */
-  bool exchangeDataAndAccelerate() override;
+  void exchangeFirstData() override final;
 
-  /**
-   * @brief ParallelCouplingScheme applies acceleration to all CouplingData
-   * @returns DataMap being accelerated
-   */
-  const DataMap getAccelerationData() override
-  {
-    PRECICE_ASSERT(!doesFirstStep(), "Only the second participant should do the acceleration.");
-    return getAllData();
-  }
+  void exchangeSecondData() override final;
 
-  /**
-   * @brief determine whether data has to be sent/received
-   */
-  void initializeImplementation() override;
-
-  /**
-   * @brief Exchanges data, if it has to be initialized.
-   */
-  void exchangeInitialData() override;
+  const DataMap getAccelerationData() override final;
 };
 
 } // namespace cplscheme

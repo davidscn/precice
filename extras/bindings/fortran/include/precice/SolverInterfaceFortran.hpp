@@ -1,5 +1,7 @@
 #pragma once
 
+#include "precice/export.h"
+
 /** @file
  * This file contains a Fortran 77 compatible interface written in C/C++.
  *
@@ -27,7 +29,7 @@ extern "C" {
  * @copydoc precice::SolverInterface::SolverInterface()
  *
  */
-void precicef_create_(
+PRECICE_API void precicef_create_(
     const char *participantName,
     const char *configFileName,
     const int * solverProcessIndex,
@@ -45,19 +47,7 @@ void precicef_create_(
  * @copydoc precice::SolverInterface::initialize()
  *
  */
-void precicef_initialize_(double *timestepLengthLimit);
-
-/**
- * Fortran syntax:
- * precicef_intialize_data()
- *
- * IN: -
- * OUT: -
- *
- * @copydoc precice::SolverInterface::initializeData()
- *
- */
-void precicef_initialize_data_();
+PRECICE_API void precicef_initialize_(double *timestepLengthLimit);
 
 /**
  * Fortran syntax:
@@ -69,7 +59,7 @@ void precicef_initialize_data_();
  * @copydoc precice::SolverInterface::advance()
  *
  */
-void precicef_advance_(double *timestepLengthLimit);
+PRECICE_API void precicef_advance_(double *timestepLengthLimit);
 
 /**
  * Fortran syntax:
@@ -78,7 +68,7 @@ void precicef_advance_(double *timestepLengthLimit);
  * @copydoc precice::SolverInterface::finalize()
  *
  */
-void precicef_finalize_();
+PRECICE_API void precicef_finalize_();
 
 /**
  * Fortran syntax:
@@ -90,21 +80,7 @@ void precicef_finalize_();
  * @copydoc precice::SolverInterface::getDimensions()
  *
  */
-void precicef_get_dims_(int *dimensions);
-
-/**
- * @deprecated Forwards to precicef_is_coupling_ongoing_
- *
- * Fortran syntax:
- * precicef_ongoing( INTEGER isOngoing )
- *
- * IN:  -
- * OUT: isOngoing(1:true, 0:false)
- *
- * @copydoc precice::SolverInterface::isOngoing()
- *
- */
-[[deprecated("Use precicef_is_coupling_ongoing_() instead.")]] void precicef_ongoing_(int *isOngoing);
+PRECICE_API void precicef_get_dims_(int *dimensions);
 
 /**
  * Fortran syntax:
@@ -116,67 +92,7 @@ void precicef_get_dims_(int *dimensions);
  * @copydoc precice::SolverInterface::isCouplingOngoing()
  *
  */
-void precicef_is_coupling_ongoing_(int *isOngoing);
-
-/**
- * @deprecated Forwards to precicef_is_write_data_required_
- *
- * Fortran syntax:
- * precicef_write_data_required(
- *  DOUBLE PRECISION computedTimestepLength,
- *  INTEGER          isRequired )
- *
- * IN:  computedTimestepLength
- * OUT: isRequired(1:true, 0:false)
- *
- * @copydoc precice::SolverInterface::isWriteDataRequired()
- *
- */
-[[deprecated("Use precicef_is_write_data_required_(...) with the same arguments instead.")]] void precicef_write_data_required_(
-    const double *computedTimestepLength,
-    int *         isRequired);
-
-/**
- * Fortran syntax:
- * precicef_is_write_data_required(
- *  DOUBLE PRECISION computedTimestepLength,
- *  INTEGER          isRequired )
- *
- * IN:  computedTimestepLength
- * OUT: isRequired(1:true, 0:false)
- *
- * @copydoc precice::SolverInterface::isWriteDataRequired()
- *
- */
-void precicef_is_write_data_required_(
-    const double *computedTimestepLength,
-    int *         isRequired);
-
-/**
- * @deprecated Forwards to precicef_is_read_data_available_
- *
- * Fortran syntax:
- * precicef_read_data_available( INTEGER isAvailable );
- *
- * IN:  -
- * OUT: isAvailable(1:true, 0:false)
- *
- * @copydoc precice::SolverInterface::isReadDataAvailable()
- *
- */
-[[deprecated("Use precicef_is_read_data_available_() instead.")]] void precicef_read_data_available_(int *isAvailable);
-
-/**
- * Fortran syntax:
- * precicef_is_read_data_available( INTEGER isAvailable );
- *
- * IN:  -
- * OUT: isAvailable(1:true, 0:false)
- *
- * @copydoc precice::SolverInterface::isReadDataAvailable()
- *
- */
-void precicef_is_read_data_available_(int *isAvailable);
+PRECICE_API void precicef_is_coupling_ongoing_(int *isOngoing);
 
 /**
  * Fortran syntax:
@@ -188,81 +104,46 @@ void precicef_is_read_data_available_(int *isAvailable);
  * @copydoc precice::SolverInterface::isTimeWindowComplete()
  *
  */
-void precicef_is_time_window_complete_(int *isComplete);
+PRECICE_API void precicef_is_time_window_complete_(int *isComplete);
 
 /**
  * Fortran syntax:
- * precicef_has_to_evaluate_surrogate_model( INTEGER hasToEvaluate );
- *
- * IN:  -
- * OUT: hasToEvaluate(1:true, 0:false)
- *
- * @copydoc precice::SolverInterface::hasToEvaluateSurrogateModel()
- *
- */
-void precicef_has_to_evaluate_surrogate_model_(int *hasToEvaluate);
-
-/**
- * Fortran syntax:
- * precicef_has_to_evaluate_fine_model( INTEGER hasToEvaluate );
- *
- * IN:  -
- * OUT: hasToEvaluate(1:true, 0:false)
- *
- * @copydoc precice::SolverInterface::hasToEvaluateFineModel()
- *
- */
-void precicef_has_to_evaluate_fine_model_(int *hasToEvaluate);
-
-/**
- * @deprecated Forwards to precicef_is_action_required_
- *
- * Fortran syntax:
- * precicef_action_required(
- *   CHARACTER action(*),
+ * precicef_requires_initial_data_(
  *   INTEGER   isRequired )
  *
- * IN:  action
+ * IN:  -
  * OUT: isRequired(1:true, 0:false)
  *
- * @copydoc precice::SolverInterface::isActionRequired()
- *
+ * @copydoc precice::SolverInterface::requiresInitialData()
  */
-[[deprecated("Use precicef_is_action_required_(...) with the same arguments instead.")]] void precicef_action_required_(
-    const char *action,
-    int *       isRequired,
-    int         lengthAction);
+PRECICE_API void precicef_requires_initial_data_(
+    int *isRequired);
 
 /**
  * Fortran syntax:
- * precicef_is_action_required(
- *   CHARACTER action(*),
+ * precicef_requires_reading_checkpoint_(
  *   INTEGER   isRequired )
  *
- * IN:  action
+ * IN:  -
  * OUT: isRequired(1:true, 0:false)
  *
- * @copydoc precice::SolverInterface::isActionRequired()
- *
+ * @copydoc precice::SolverInterface::requiresReadingCheckpoint()
  */
-void precicef_is_action_required_(
-    const char *action,
-    int *       isRequired,
-    int         lengthAction);
+PRECICE_API void precicef_requires_reading_checkpoint_(
+    int *isRequired);
 
 /**
  * Fortran syntax:
- * precicef_mark_action_fulfilled( CHARACTER action(*) )
+ * precicef_requires_writing_checkpoint_(
+ *   INTEGER   isRequired )
  *
- * IN:  action
- * OUT: -
+ * IN:  -
+ * OUT: isRequired(1:true, 0:false)
  *
- * @copydoc precice::SolverInterface::markActionFulfilled()
- *
+ * @copydoc precice::SolverInterface::requiresWritingCheckpoint()
  */
-void precicef_mark_action_fulfilled_(
-    const char *action,
-    int         lengthAction);
+PRECICE_API void precicef_requires_writing_checkpoint_(
+    int *isRequired);
 
 /**
  * Fortran syntax:
@@ -276,7 +157,7 @@ void precicef_mark_action_fulfilled_(
  * @copydoc precice::SolverInterface::hasMesh()
  *
  */
-void precicef_has_mesh_(
+PRECICE_API void precicef_has_mesh_(
     const char *meshName,
     int *       hasMesh,
     int         lengthMeshName);
@@ -293,7 +174,7 @@ void precicef_has_mesh_(
  * @copydoc precice::SolverInterface::getMeshID()
  *
  */
-void precicef_get_mesh_id_(
+PRECICE_API void precicef_get_mesh_id_(
     const char *meshName,
     int *       meshID,
     int         lengthMeshName);
@@ -312,7 +193,7 @@ void precicef_get_mesh_id_(
  * @copydoc precice::SolverInterface::hasData()
  *
  */
-void precicef_has_data_(
+PRECICE_API void precicef_has_data_(
     const char *dataName,
     const int * meshID,
     int *       hasData,
@@ -337,7 +218,7 @@ void precicef_has_data_(
  * @copydoc precice::SolverInterface::getDataID()
  *
  */
-void precicef_get_data_id_(
+PRECICE_API void precicef_get_data_id_(
     const char *dataName,
     const int * meshID,
     int *       dataID,
@@ -352,9 +233,9 @@ void precicef_get_data_id_(
  * IN:  meshID
  * OUT: required(1:true, 0:false)
  *
- * @copydoc precice::SolverInterface::isMeshConnectivityRequired()
+ * @copydoc precice::SolverInterface::requiresMeshConnectivityFor()
  */
-void precicef_is_mesh_connectivity_required_(
+PRECICE_API void precicef_requires_mesh_connectivity_for_(
     const int *meshID,
     int *      required);
 
@@ -371,7 +252,7 @@ void precicef_is_mesh_connectivity_required_(
  * @copydoc precice::SolverInterface::setMeshVertex()
  *
  */
-void precicef_set_vertex_(
+PRECICE_API void precicef_set_vertex_(
     const int *   meshID,
     const double *position,
     int *         vertexID);
@@ -388,7 +269,7 @@ void precicef_set_vertex_(
  * @copydoc precice::SolverInterface::getMeshVertexSize()
  *
  */
-void precicef_get_mesh_vertex_size_(
+PRECICE_API void precicef_get_mesh_vertex_size_(
     const int *meshID,
     int *      meshSize);
 
@@ -406,7 +287,7 @@ void precicef_get_mesh_vertex_size_(
  * @copydoc precice::SolverInterface::setMeshVertices()
  *
  */
-void precicef_set_vertices_(
+PRECICE_API void precicef_set_vertices_(
     const int *meshID,
     const int *size,
     double *   positions,
@@ -414,87 +295,43 @@ void precicef_set_vertices_(
 
 /**
  * Fortran syntax:
- * precicef_get_vertices(
- *   INTEGER          meshID,
- *   INTEGER          size,
- *   INTEGER          ids(size)
- *   DOUBLE PRECISION positions(dim*size))
- *
- * IN:  meshID, size, ids
- * OUT: positions
- *
- * @copydoc precice::SolverInterface::getMeshVertices()
- *
- */
-void precicef_get_vertices_(
-    const int *meshID,
-    const int *size,
-    int *      ids,
-    double *   positions);
-
-/**
- * Fortran syntax:
- * precicef_get_vertices(
- *   INTEGER          meshID,
- *   INTEGER          size,
- *   DOUBLE PRECISION positions(dim*size),
- *   INTEGER          ids(size))
- *
- * IN:  meshID, size, positions
- * OUT: ids
- *
- * @copydoc precice::SolverInterface::getMeshVertexIDsFromPositions()
- *
- */
-void precicef_get_vertex_ids_from_positions_(
-    const int *meshID,
-    const int *size,
-    double *   positions,
-    int *      ids);
-
-/**
- * Fortran syntax:
  * precicef_set_edge(
  *   INTEGER meshID,
  *   INTEGER firstVertexID,
- *   INTEGER secondVertexID,
- *   INTEGER edgeID )
+ *   INTEGER secondVertexID )
  *
  * IN:  meshID, firstVertexID, secondVertexID
- * OUT: edgeID
+ * OUT: -
  *
  * @copydoc precice::SolverInterface::setMeshEdge()
  *
  */
-void precicef_set_edge_(
+PRECICE_API void precicef_set_edge_(
     const int *meshID,
     const int *firstVertexID,
-    const int *secondVertexID,
-    int *      edgeID);
+    const int *secondVertexID);
 
 /**
  * Fortran syntax:
- * precicef_set_triangle(
+ * precicef_set_mesh_edges_(
  *   INTEGER meshID,
- *   INTEGER firstEdgeID,
- *   INTEGER secondEdgeID,
- *   INTEGER thirdEdgeID )
+ *   INTEGER size,
+ *   INTEGER vertices(size*2) )
  *
- * IN:  meshID, firstEdgeID, secondEdgeID, thirdEdgeID
+ * IN:  meshID, size, vertices
  * OUT: -
  *
- * @copydoc precice::SolverInterface::setMeshTriangle()
+ * @copydoc precice::SolverInterface::setMeshEdges()
  *
  */
-void precicef_set_triangle_(
+PRECICE_API void precicef_set_mesh_edges_(
     const int *meshID,
-    const int *firstEdgeID,
-    const int *secondEdgeID,
-    const int *thirdEdgeID);
+    const int *size,
+    const int *vertices);
 
 /**
  * Fortran syntax:
- * precicef_set_triangle_we(
+ * precicef_set_triangle_(
  *   INTEGER meshID,
  *   INTEGER firstVertexID,
  *   INTEGER secondVertexID,
@@ -503,10 +340,10 @@ void precicef_set_triangle_(
  * IN:  meshID, firstVertexID, secondVertexID, thirdVertexID
  * OUT: -
  *
- * @copydoc precice::SolverInterface::setMeshTriangleWithEdges()
+ * @copydoc precice::SolverInterface::setMeshTriangle()
  *
  */
-void precicef_set_triangle_we_(
+PRECICE_API void precicef_set_triangle_(
     const int *meshID,
     const int *firstVertexID,
     const int *secondVertexID,
@@ -514,29 +351,25 @@ void precicef_set_triangle_we_(
 
 /**
  * Fortran syntax:
- * precicef_set_quad(
+ * precicef_set_mesh_triangles_(
  *   INTEGER meshID,
- *   INTEGER firstEdgeID,
- *   INTEGER secondEdgeID,
- *   INTEGER thirdEdgeID,
- *   INTEGER fourthEdgeID )
+ *   INTEGER size,
+ *   INTEGER vertices(size*3) )
  *
- * IN:  meshID, firstEdgeID, secondEdgeID, thirdEdgeID, fourthEdgeID
+ * IN:  meshID, size, vertices
  * OUT: -
  *
- * @copydoc precice::SolverInterface::setMeshQuad()
+ * @copydoc precice::SolverInterface::setMeshTriangles()
  *
  */
-void precicef_set_quad_(
+PRECICE_API void precicef_set_mesh_edges_(
     const int *meshID,
-    const int *firstEdgeID,
-    const int *secondEdgeID,
-    const int *thirdEdgeID,
-    const int *fourthEdgeID);
+    const int *size,
+    const int *vertices);
 
 /**
  * Fortran syntax:
- * precicef_set_quad_we(
+ * precicef_set_quad_(
  *   INTEGER meshID,
  *   INTEGER firstVertexID,
  *   INTEGER secondVertexID,
@@ -546,15 +379,33 @@ void precicef_set_quad_(
  * IN:  meshID, firstVertexID, secondVertexID, thirdVertexID, fourthVertexID
  * OUT: -
  *
- * @copydoc precice::SolverInterface::setMeshQuadWithEdges()
+ * @copydoc precice::SolverInterface::setMeshQuad()
  *
  */
-void precicef_set_quad_we_(
+PRECICE_API void precicef_set_quad_(
     const int *meshID,
     const int *firstVertexID,
     const int *secondVertexID,
     const int *thirdVertexID,
     const int *fourthVertexID);
+
+/**
+ * Fortran syntax:
+ * precicef_set_mesh_quads(
+ *   INTEGER meshID,
+ *   INTEGER size,
+ *   INTEGER vertices(size*4) )
+ *
+ * IN:  meshID, size, vertices
+ * OUT: -
+ *
+ * @copydoc precice::SolverInterface::setMeshQuads()
+ *
+ */
+PRECICE_API void precicef_set_mesh_quads_(
+    const int *meshID,
+    const int *size,
+    const int *vertices);
 
 /**
  * Fortran syntax:
@@ -571,12 +422,30 @@ void precicef_set_quad_we_(
  * @copydoc precice::SolverInterface::setMeshTetrahedron()
  *
  */
-void precicef_set_tetrahedron(
+PRECICE_API void precicef_set_tetrahedron(
     const int *meshID,
     const int *firstVertexID,
     const int *secondVertexID,
     const int *thirdVertexID,
     const int *fourthVertexID);
+
+/**
+ * Fortran syntax:
+ * precicef_set_mesh_tetrahedra_(
+ *   INTEGER meshID,
+ *   INTEGER size,
+ *   INTEGER vertices(size*4) )
+ *
+ * IN:  meshID, size, vertices
+ * OUT: -
+ *
+ * @copydoc precice::SolverInterface::setMeshTetrahedra()
+ *
+ */
+PRECICE_API void precicef_set_mesh_tetrahedra_(
+    const int *meshID,
+    const int *size,
+    const int *vertices);
 
 /**
  * Fortran syntax:
@@ -592,7 +461,7 @@ void precicef_set_tetrahedron(
  * @copydoc precice::SolverInterface::writeBlockVectorData
  *
  */
-void precicef_write_bvdata_(
+PRECICE_API void precicef_write_bvdata_(
     const int *dataID,
     const int *size,
     int *      valueIndices,
@@ -611,7 +480,7 @@ void precicef_write_bvdata_(
  * @copydoc precice::SolverInterface::writeVectorData
  *
  */
-void precicef_write_vdata_(
+PRECICE_API void precicef_write_vdata_(
     const int *   dataID,
     const int *   valueIndex,
     const double *dataValue);
@@ -630,7 +499,7 @@ void precicef_write_vdata_(
  * @copydoc precice::SolverInterface::writeBlockScalarData
  *
  */
-void precicef_write_bsdata_(
+PRECICE_API void precicef_write_bsdata_(
     const int *dataID,
     const int *size,
     int *      valueIndices,
@@ -649,7 +518,7 @@ void precicef_write_bsdata_(
  * @copydoc precice::SolverInterface::writeScalarData
  *
  */
-void precicef_write_sdata_(
+PRECICE_API void precicef_write_sdata_(
     const int *   dataID,
     const int *   valueIndex,
     const double *dataValue);
@@ -668,7 +537,7 @@ void precicef_write_sdata_(
  * @copydoc precice::SolverInterface::readBlockVectorData
  *
  */
-void precicef_read_bvdata_(
+PRECICE_API void precicef_read_bvdata_(
     const int *dataID,
     const int *size,
     int *      valueIndices,
@@ -687,7 +556,7 @@ void precicef_read_bvdata_(
  * @copydoc precice::SolverInterface::readVectorData
  *
  */
-void precicef_read_vdata_(
+PRECICE_API void precicef_read_vdata_(
     const int *dataID,
     const int *valueIndex,
     double *   dataValue);
@@ -706,7 +575,7 @@ void precicef_read_vdata_(
  * @copydoc precice::SolverInterface::readBlockScalarData
  *
  */
-void precicef_read_bsdata_(
+PRECICE_API void precicef_read_bsdata_(
     const int *dataID,
     const int *size,
     int *      valueIndices,
@@ -725,66 +594,12 @@ void precicef_read_bsdata_(
  * @copydoc precice::SolverInterface::readScalarData
  *
  */
-void precicef_read_sdata_(
+PRECICE_API void precicef_read_sdata_(
     const int *dataID,
     const int *valueIndex,
     double *   dataValue);
 
-/**
- * Fortran syntax:
- * precicef_map_write_data_from( INTEGER meshID )
- *
- * IN:  meshID
- * OUT: -
- *
- * @copydoc precice::SolverInterface::mapWriteDataFrom()
- *
- */
-void precicef_map_write_data_from_(const int *meshID);
-
-/**
- * Fortran syntax:
- * precicef_map_read_data_to( INTEGER meshID )
- *
- * IN:  meshID
- * OUT: -
- *
- * @copydoc precice::SolverInterface::mapReadDataTo()
- *
- */
-void precicef_map_read_data_to_(const int *meshID);
-
-/**
- * @brief Name of action for writing iteration checkpoint.
- *
- * Fortran syntax:
- * precicef_action_write_iter_checkpoint( CHARACTER nameAction(*) )
- */
-void precicef_action_write_iter_checkp_(
-    char *nameAction,
-    int   lengthNameAction);
-
-/**
- * @brief Name of action for writing initial data.
- *
- * FortranSyntax:
- * precicef_action_write_initial_data( CHARACTER nameAction(*) )
- */
-void precicef_action_write_initial_data_(
-    char *nameAction,
-    int   lengthNameAction);
-
-/**
- * @brief Name of action for reading iteration checkpoint.
- *
- * Fortran syntax:
- * precicef_action_read_iter_checkpoint( CHARACTER nameAction(*) )
- */
-void precicef_action_read_iter_checkp_(
-    char *nameAction,
-    int   lengthNameAction);
-
-void precicef_get_version_information_(
+PRECICE_API void precicef_get_version_information_(
     char *versionInfo,
     int   lengthVersionInfo);
 
@@ -792,6 +607,91 @@ void precicef_get_version_information_(
  * These API functions are \b experimental and may change in future versions.
  */
 ///@{
+
+/**
+ * Fortran syntax:
+ * precicef_requires_gradient_data_for_(
+ *   INTEGER dataID,
+ *   INTEGER required )
+ *
+ * IN:  dataID
+ * OUT: required(1:true, 0:false)
+ *
+ * @copydoc precice::SolverInterface::requiresGradientDataFor
+ */
+PRECICE_API void precicef_requires_gradient_data_for_(const int *dataID, int *required);
+
+/**
+ * Fortran syntax:
+ * precicef_write_sgradient_data_(
+ *   INTEGER dataID,
+ *   INTEGER valueIndex,
+ *   DOUBLE PRECISION gradientValues )
+ *
+ * IN:  dataID, valueIndex, gradientValues
+ * OUT: -
+ *
+ * @copydoc precice::SolverInterface::writeScalarGradientData
+ */
+PRECICE_API void precicef_write_sgradient_data_(
+    const int *   dataID,
+    const int *   valueIndex,
+    const double *gradientValues);
+
+/**
+ * Fortran syntax:
+ * precicef_write_bsgradient_data_(
+ *   INTEGER dataID,
+ *   INTEGER size,
+ *   INTEGER valueIndices,
+ *   DOUBLE PRECISION gradientValues )
+ *
+ * IN:  dataID, size, valueIndices, gradientValues
+ * OUT: -
+ *
+ * @copydoc precice::SolverInterface::writeBlockScalarGradientData
+ */
+PRECICE_API void precicef_write_bsgradient_data_(
+    const int *   dataID,
+    const int *   size,
+    const int *   valueIndices,
+    const double *gradientValues);
+
+/**
+ * Fortran syntax:
+ * precicef_write_vgradient_data_(
+ *   INTEGER dataID,
+ *   INTEGER valueIndex,
+ *   DOUBLE PRECISION gradientValues )
+ *
+ * IN:  dataID, valueIndex, gradientValues
+ * OUT: -
+ *
+ * @copydoc precice::SolverInterface::writeVectorGradientData
+ */
+PRECICE_API void precicef_write_vgradient_data_(
+    const int *   dataID,
+    const int *   valueIndex,
+    const double *gradientValues);
+
+/**
+ * Fortran syntax:
+ * precicef_write_bvgradient_data_(
+ *   INTEGER dataID,
+ *   INTEGER size,
+ *   INTEGER valueIndices,
+ *   DOUBLE PRECISION gradientValues )
+ *
+ * IN:  dataID, size, valueIndices, gradientValues
+ * OUT: -
+ *
+ * @copydoc precice::SolverInterface::writeBlockVectorGradientData
+ */
+PRECICE_API void precicef_write_bvgradient_data_(
+    const int *   dataID,
+    const int *   size,
+    const int *   valueIndices,
+    const double *gradientValues);
 
 /**
  * Fortran syntax:
@@ -804,7 +704,7 @@ void precicef_get_version_information_(
  *
  * @copydoc precice::SolverInterface::setMeshAccessRegion()
  */
-void precicef_set_mesh_access_region_(
+PRECICE_API void precicef_set_mesh_access_region_(
     const int     meshID,
     const double *boundingBox);
 
@@ -821,7 +721,7 @@ void precicef_set_mesh_access_region_(
  *
  * @copydoc precice::SolverInterface::getMeshVerticesAndIDs()
  */
-void precicef_get_mesh_vertices_and_IDs_(
+PRECICE_API void precicef_get_mesh_vertices_and_IDs_(
     const int meshID,
     const int size,
     int *     ids,

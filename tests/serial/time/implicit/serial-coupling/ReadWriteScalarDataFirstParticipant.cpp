@@ -53,28 +53,43 @@ BOOST_AUTO_TEST_CASE(ReadWriteScalarDataFirstParticipant)
   VertexID vertexID = precice.setMeshVertex(meshID, Eigen::Vector3d(0.0, 0.0, 0.0).data());
   double   dt       = precice.initialize();
 
-  if (precice.isActionRequired(precice::constants::actionWriteIterationCheckpoint())) {
-    precice.markActionFulfilled(precice::constants::actionWriteIterationCheckpoint());
+  if (precice.requiresWritingCheckpoint()) {
+    // do nothing
   }
 
-  for (int i = 0; i < timestepSizes.size(); i++) {
-    for (int it = 0; it < maxIterations; it++) {
+  double startOfWindowTime = 0;
+  double timeInWindow      = 0;
+  double totalTime         = 6; // max-time from config
 
+  for (auto iterationSizes : timestepSizes) {
+    for (int it = 0; it < maxIterations; it++) {
+      actualDataValue = -1; // reset value.
       BOOST_TEST(precice.isCouplingOngoing());
       precice.writeScalarData(writeDataID, vertexID, expectedDataValue);
 
       if (context.isNamed("SolverOne")) {
-        precice.advance(timestepSizes.at(i).at(it));
+        dt = precice.advance(iterationSizes.at(it));
+        timeInWindow += iterationSizes.at(it);
       } else if (context.isNamed("SolverTwo")) {
-        BOOST_TEST(dt == timestepSizes.at(i).at(it));
+        BOOST_TEST(dt == iterationSizes.at(it));
         dt = precice.advance(dt);
       }
 
-      if (precice.isActionRequired(precice::constants::actionReadIterationCheckpoint())) {
-        precice.markActionFulfilled(precice::constants::actionReadIterationCheckpoint());
+      if (precice.requiresReadingCheckpoint()) {
+        timeInWindow = 0;
       }
-      if (precice.isActionRequired(precice::constants::actionWriteIterationCheckpoint())) {
-        precice.markActionFulfilled(precice::constants::actionWriteIterationCheckpoint());
+      if (precice.isTimeWindowComplete()) {
+        startOfWindowTime += timeInWindow;
+        timeInWindow = 0;
+      }
+
+      if (context.isNamed("SolverOne")) {
+        // Check remainder of simulation time
+        BOOST_TEST(dt == totalTime - startOfWindowTime);
+      }
+
+      if (precice.requiresWritingCheckpoint()) {
+        // do nothing
       }
 
       precice.readScalarData(readDataID, vertexID, actualDataValue);

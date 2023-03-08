@@ -43,7 +43,6 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
 {
   PRECICE_TEST("SolverOne"_on(1_rank), "SolverTwo"_on(1_rank))
 
-  using Eigen::Vector2d;
   using Eigen::Vector3d;
 
   SolverInterface cplInterface(context.name, context.config(), 0, 1);
@@ -51,16 +50,14 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
     int      meshOneID = cplInterface.getMeshID("MeshOne");
     Vector3d posOne    = Vector3d::Constant(0.0);
     cplInterface.setMeshVertex(meshOneID, posOne.data());
-    double maxDt   = cplInterface.initialize();
-    int    dataAID = cplInterface.getDataID("DataOne", meshOneID);
-    int    dataBID = cplInterface.getDataID("DataTwo", meshOneID);
+    int dataAID = cplInterface.getDataID("DataOne", meshOneID);
+    int dataBID = cplInterface.getDataID("DataTwo", meshOneID);
 
-    Vector2d valueDataB;
+    Vector3d valueDataB;
 
-    cplInterface.markActionFulfilled(precice::constants::actionWriteInitialData());
-    cplInterface.initializeData();
+    double maxDt = cplInterface.initialize();
     cplInterface.readVectorData(dataBID, 0, valueDataB.data());
-    Vector2d expected(2.0, 3.0);
+    Vector3d expected(2.0, 3.0, 4.0);
     BOOST_TEST(valueDataB == expected);
 
     while (cplInterface.isCouplingOngoing()) {
@@ -73,7 +70,7 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
       maxDt = cplInterface.advance(maxDt);
 
       cplInterface.readVectorData(dataBID, 0, valueDataB.data());
-      expected << 2.5, 3.5;
+      expected << 2.5, 3.5, 4.5;
       BOOST_TEST(valueDataB == expected);
     }
     cplInterface.finalize();
@@ -84,16 +81,15 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
     Vector3d pos       = Vector3d::Constant(1.0);
     cplInterface.setMeshVertex(meshTwoID, pos.data());
 
-    double maxDt   = cplInterface.initialize();
-    int    dataAID = cplInterface.getDataID("DataOne", meshTwoID);
-    int    dataBID = cplInterface.getDataID("DataTwo", meshTwoID);
+    int dataAID = cplInterface.getDataID("DataOne", meshTwoID);
+    int dataBID = cplInterface.getDataID("DataTwo", meshTwoID);
 
-    Vector2d valueDataB(2.0, 3.0);
+    BOOST_REQUIRE(cplInterface.requiresInitialData());
+    Vector3d valueDataB(2.0, 3.0, 4.0);
     cplInterface.writeVectorData(dataBID, 0, valueDataB.data());
 
-    //tell preCICE that data has been written and call initializeData
-    cplInterface.markActionFulfilled(precice::constants::actionWriteInitialData());
-    cplInterface.initializeData();
+    //tell preCICE that data has been written and call initialize
+    double maxDt = cplInterface.initialize();
 
     Vector3d valueDataA;
     cplInterface.readVectorData(dataAID, 0, valueDataA.data());
@@ -102,7 +98,7 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
 
     while (cplInterface.isCouplingOngoing()) {
 
-      valueDataB << 2.5, 3.5;
+      valueDataB << 2.5, 3.5, 4.5;
       cplInterface.writeVectorData(dataBID, 0, valueDataB.data());
 
       maxDt = cplInterface.advance(maxDt);

@@ -76,30 +76,13 @@ private:
   /// Receives and sets the time window size, if this participant is the one to receive
   void receiveAndSetTimeWindowSize();
 
-  /**
-   * @brief Exchanges data between the participants of the SerialCouplingSchemes and applies acceleration.
-   * @returns true, if iteration converged
-   */
-  bool exchangeDataAndAccelerate() override;
+  void performReceiveOfFirstAdvance() override final;
 
-  /**
-   * @brief SerialCouplingSchemes applies acceleration to send data
-   * @returns DataMap being accelerated
-   */
-  const DataMap getAccelerationData() override
-  {
-    return getSendData();
-  }
+  void exchangeFirstData() override;
 
-  /**
-   * @brief determine whether data has to be sent/received
-   */
-  void initializeImplementation() override;
+  void exchangeSecondData() override final;
 
-  /**
-   * @brief Exchanges data, if it has to be initialized.
-   */
-  void exchangeInitialData() override;
+  const DataMap getAccelerationData() override final;
 };
 
 } // namespace cplscheme

@@ -7,7 +7,7 @@
 #include "io/SharedPointer.hpp"
 #include "logging/Logger.hpp"
 #include "mapping/SharedPointer.hpp"
-#include "mapping/config/MappingConfiguration.hpp"
+#include "mapping/config/MappingConfigurationTypes.hpp"
 #include "mesh/SharedPointer.hpp"
 #include "partition/ReceivedPartition.hpp"
 #include "precice/config/SolverInterfaceConfiguration.hpp"
@@ -54,6 +54,9 @@ public:
   /// Returns all configured participants.
   const std::vector<impl::PtrParticipant> &getParticipants() const;
 
+  /// Returns a participant with the given name
+  const impl::PtrParticipant getParticipant(const std::string &participantName) const;
+
 private:
   struct WatchPointConfig {
     std::string     name;
@@ -73,10 +76,10 @@ private:
   const std::string TAG_WRITE          = "write-data";
   const std::string TAG_READ           = "read-data";
   const std::string TAG_DATA_ACTION    = "data-action";
-  const std::string TAG_USE_MESH       = "use-mesh";
+  const std::string TAG_PROVIDE_MESH   = "provide-mesh";
+  const std::string TAG_RECEIVE_MESH   = "receive-mesh";
   const std::string TAG_WATCH_INTEGRAL = "watch-integral";
   const std::string TAG_WATCH_POINT    = "watch-point";
-  const std::string TAG_MASTER         = "master";
   const std::string TAG_INTRA_COMM     = "intra-comm";
 
   const std::string ATTR_NAME               = "name";
@@ -99,9 +102,7 @@ private:
   const std::string ATTR_SCALE_WITH_CONN    = "scale-with-connectivity";
   const std::string ATTR_ORDER              = "waveform-order";
 
-  const std::string VALUE_FILTER_ON_SLAVES          = "on-slaves";
   const std::string VALUE_FILTER_ON_SECONDARY_RANKS = "on-secondary-ranks";
-  const std::string VALUE_FILTER_ON_MASTER          = "on-master";
   const std::string VALUE_FILTER_ON_PRIMARY_RANK    = "on-primary-rank";
   const std::string VALUE_NO_FILTER                 = "no-filter";
 

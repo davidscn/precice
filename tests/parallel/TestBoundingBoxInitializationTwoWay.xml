@@ -15,26 +15,24 @@
     </mesh>
 
     <participant name="Fluid">
-      <use-mesh name="FluidMesh" provide="yes" />
-      <use-mesh name="StructureMesh" from="Structure" />
+      <provide-mesh name="FluidMesh" />
+      <receive-mesh name="StructureMesh" from="Structure" />
       <write-data name="Forces" mesh="FluidMesh" />
       <read-data name="Velocities" mesh="FluidMesh" />
       <mapping:nearest-neighbor
         direction="write"
         from="FluidMesh"
         to="StructureMesh"
-        constraint="conservative"
-        timing="initial" />
+        constraint="conservative" />
       <mapping:nearest-neighbor
         direction="read"
         from="StructureMesh"
         to="FluidMesh"
-        constraint="consistent"
-        timing="initial" />
+        constraint="consistent" />
     </participant>
 
     <participant name="Structure">
-      <use-mesh name="StructureMesh" provide="yes" />
+      <provide-mesh name="StructureMesh" />
       <write-data name="Velocities" mesh="StructureMesh" />
       <read-data name="Forces" mesh="StructureMesh" />
     </participant>

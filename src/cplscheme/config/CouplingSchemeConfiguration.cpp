@@ -36,8 +36,7 @@
 #include "xml/XMLAttribute.hpp"
 #include "xml/XMLTag.hpp"
 
-namespace precice {
-namespace cplscheme {
+namespace precice::cplscheme {
 
 CouplingSchemeConfiguration::CouplingSchemeConfiguration(
     xml::XMLTag &                        parent,
@@ -206,7 +205,8 @@ void CouplingSchemeConfiguration::xmlTagCallback(
     _config.timeWindowSize = tag.getDoubleAttributeValue(ATTR_VALUE);
     _config.validDigits    = tag.getIntAttributeValue(ATTR_VALID_DIGITS);
     PRECICE_CHECK((_config.validDigits >= 1) && (_config.validDigits < 17), "Valid digits of time window size has to be between 1 and 16.");
-    _config.dtMethod = getTimesteppingMethod(tag.getStringAttributeValue(ATTR_METHOD));
+    // Attribute does not exist for parallel coupling schemes as it is always fixed.
+    _config.dtMethod = getTimesteppingMethod(tag.getStringAttributeValue(ATTR_METHOD, VALUE_FIXED));
     if (_config.dtMethod == constants::TimesteppingMethod::FIXED_TIME_WINDOW_SIZE) {
       PRECICE_CHECK(_config.timeWindowSize > 0,
                     "Time window size has to be larger than zero. "
@@ -276,9 +276,14 @@ void CouplingSchemeConfiguration::xmlTagCallback(
     mesh::PtrData exchangeData = exchangeMesh->data(nameData);
     PRECICE_ASSERT(exchangeData);
 
+    Config::Exchange newExchange{exchangeData, exchangeMesh, nameParticipantFrom, nameParticipantTo, initialize};
+    PRECICE_CHECK(!_config.hasExchange(newExchange),
+                  R"(Data "{}" of mesh "{}" cannot be exchanged multiple times between participants "{}" and "{}". Please remove one of the exchange tags.)",
+                  nameData, nameMesh, nameParticipantFrom, nameParticipantTo);
+
     _meshConfig->addNeededMesh(nameParticipantFrom, nameMesh);
     _meshConfig->addNeededMesh(nameParticipantTo, nameMesh);
-    _config.exchanges.emplace_back(Config::Exchange{exchangeData, exchangeMesh, nameParticipantFrom, nameParticipantTo, initialize});
+    _config.exchanges.emplace_back(std::move(newExchange));
   } else if (tag.getName() == TAG_MAX_ITERATIONS) {
     PRECICE_ASSERT(_config.type == VALUE_SERIAL_IMPLICIT || _config.type == VALUE_PARALLEL_IMPLICIT || _config.type == VALUE_MULTI);
     _config.maxIterations = tag.getIntAttributeValue(ATTR_VALUE);
@@ -288,8 +293,8 @@ void CouplingSchemeConfiguration::xmlTagCallback(
   } else if (tag.getName() == TAG_EXTRAPOLATION) {
     PRECICE_ASSERT(_config.type == VALUE_SERIAL_IMPLICIT || _config.type == VALUE_PARALLEL_IMPLICIT || _config.type == VALUE_MULTI);
     _config.extrapolationOrder = tag.getIntAttributeValue(ATTR_VALUE);
-    PRECICE_CHECK((_config.extrapolationOrder == 0) || (_config.extrapolationOrder == 1) || (_config.extrapolationOrder == 2),
-                  "Extrapolation order has to be 0, 1, or 2. "
+    PRECICE_CHECK((_config.extrapolationOrder == 0) || (_config.extrapolationOrder == 1),
+                  "Extrapolation order has to be 0 or 1. "
                   "Please check the <extrapolation-order value=\"{}\" /> subtag in the <coupling-scheme:... /> of your precice-config.xml.",
                   _config.extrapolationOrder);
   }
@@ -330,10 +335,6 @@ void CouplingSchemeConfiguration::xmlEndTagCallback(
       //_couplingSchemes[accessor] = scheme;
       _config = Config();
     } else if (_config.type == VALUE_SERIAL_IMPLICIT) {
-      if (_experimental) {
-        int maxAllowedOrder = 0; // serial implicit coupling does not allow waveform iteration yet (see https://github.com/precice/precice/issues/1174#issuecomment-1042823430)
-        checkWaveformOrderReadData(maxAllowedOrder);
-      }
       std::string       accessor(_config.participants[0]);
       PtrCouplingScheme scheme = createSerialImplicitCouplingScheme(accessor);
       addCouplingScheme(scheme, accessor);
@@ -352,10 +353,6 @@ void CouplingSchemeConfiguration::xmlEndTagCallback(
       addCouplingScheme(scheme, accessor);
       _config = Config();
     } else if (_config.type == VALUE_MULTI) {
-      if (_experimental) {
-        int maxAllowedOrder = 0; // multi coupling scheme does not allow waveform iteration
-        checkWaveformOrderReadData(maxAllowedOrder);
-      }
       PRECICE_CHECK(_config.setController,
                     "One controller per MultiCoupling needs to be defined. "
                     "Please check the <participant name=... /> tags in the <coupling-scheme:... /> of your precice-config.xml. "
@@ -376,37 +373,37 @@ void CouplingSchemeConfiguration::addCouplingScheme(
     const std::string &      participantName)
 {
   PRECICE_TRACE(participantName);
-  if (utils::contained(participantName, _couplingSchemes)) {
-    PRECICE_DEBUG("Coupling scheme exists already for participant");
-    if (utils::contained(participantName, _couplingSchemeCompositions)) {
-      PRECICE_DEBUG("Coupling scheme composition exists already for participant");
-      // Fetch the composition and add the new scheme.
-      PRECICE_ASSERT(_couplingSchemeCompositions[participantName] != nullptr);
-      _couplingSchemeCompositions[participantName]->addCouplingScheme(cplScheme);
-    } else {
-      PRECICE_DEBUG("No composition exists for the participant");
-      // No composition exists, thus, the existing scheme is no composition.
-      // Create a new composition, add the already existing and new scheme, and
-      // overwrite the existing scheme with the composition.
-      CompositionalCouplingScheme *composition = new CompositionalCouplingScheme();
-      PRECICE_CHECK(nullptr == dynamic_cast<MultiCouplingScheme *>(_couplingSchemes[participantName].get()),
-                    "A Multi Coupling Scheme cannot yet be combined with any other coupling scheme. "
-                    "Try to include all participants within one multi coupling scheme instead.");
-      composition->addCouplingScheme(_couplingSchemes[participantName]);
-      composition->addCouplingScheme(cplScheme);
-      _couplingSchemes[participantName] = PtrCouplingScheme(composition);
-    }
-  } else {
+  if (!utils::contained(participantName, _couplingSchemes)) {
     PRECICE_DEBUG("No coupling scheme exists for the participant");
     // Store the new coupling scheme.
     _couplingSchemes[participantName] = cplScheme;
+    return;
   }
+  PRECICE_ASSERT(_couplingSchemes.count(participantName) > 0);
+
+  // Create a composition to add the new cplScheme to
+  if (!utils::contained(participantName, _couplingSchemeCompositions)) {
+    PRECICE_DEBUG("Creating a compositional coupling scheme for the participant");
+    auto composition = std::make_shared<CompositionalCouplingScheme>();
+    composition->addCouplingScheme(_couplingSchemes[participantName]);
+    _couplingSchemeCompositions[participantName] = composition.get();
+    _couplingSchemes[participantName]            = std::move(composition);
+  }
+
+  PRECICE_ASSERT(_couplingSchemeCompositions.count(participantName) > 0);
+
+  // Add the new scheme to the composition
+  auto composition = _couplingSchemeCompositions.at(participantName);
+  PRECICE_CHECK(!cplScheme->isImplicitCouplingScheme() || !composition->isImplicitCouplingScheme(),
+                "You attempted to define a second implicit coupling-scheme for the participant \"{}\", which is not allowed. "
+                "Please use a multi coupling-scheme for true implicit coupling of multiple participants.",
+                participantName);
+  _couplingSchemeCompositions[participantName]->addCouplingScheme(cplScheme);
 }
 
 void CouplingSchemeConfiguration::addTypespecifcSubtags(
     const std::string &type,
-    //const std::string& name,
-    xml::XMLTag &tag)
+    xml::XMLTag &      tag)
 {
   PRECICE_TRACE(type);
   addTransientLimitTags(type, tag);
@@ -483,17 +480,15 @@ void CouplingSchemeConfiguration::addTransientLimitTags(
   XMLAttribute<int> attrValidDigits(ATTR_VALID_DIGITS, 10);
   attrValidDigits.setDocumentation(R"(Precision to use when checking for end of time windows used this many digits. \\(\phi = 10^{-validDigits}\\))");
   tagTimeWindowSize.addAttribute(attrValidDigits);
-  std::vector<std::string> allowedMethods;
   if (type == VALUE_SERIAL_EXPLICIT || type == VALUE_SERIAL_IMPLICIT) {
     // method="first-participant" is only allowed for serial coupling schemes
-    allowedMethods = {VALUE_FIXED, VALUE_FIRST_PARTICIPANT};
+    auto attrMethod = makeXMLAttribute(ATTR_METHOD, VALUE_FIXED)
+                          .setOptions({VALUE_FIXED, VALUE_FIRST_PARTICIPANT})
+                          .setDocumentation("The method used to determine the time window size. Use `fixed` to fix the time window size for the participants.");
+    tagTimeWindowSize.addAttribute(attrMethod);
   } else {
-    allowedMethods = {VALUE_FIXED};
+    tagTimeWindowSize.addAttributeHint(ATTR_METHOD, "This feature is only available for serial coupling schemes.");
   }
-  auto attrMethod = makeXMLAttribute(ATTR_METHOD, VALUE_FIXED)
-                        .setOptions(allowedMethods)
-                        .setDocumentation("The method used to determine the time window size. Use `fixed` to fix the time window size for the participants.");
-  tagTimeWindowSize.addAttribute(attrMethod);
   tag.addSubtag(tagTimeWindowSize);
 }
 
@@ -541,7 +536,7 @@ void CouplingSchemeConfiguration::addTagExchange(
   tagExchange.addAttribute(participantFrom);
   auto participantTo = XMLAttribute<std::string>(ATTR_TO).setDocumentation("The participant receiving the data.");
   tagExchange.addAttribute(participantTo);
-  auto attrInitialize = XMLAttribute<bool>(ATTR_INITIALIZE, false).setDocumentation("Should this data be initialized during initializeData?");
+  auto attrInitialize = XMLAttribute<bool>(ATTR_INITIALIZE, false).setDocumentation("Should this data be initialized during initialize?");
   tagExchange.addAttribute(attrInitialize);
   tag.addSubtag(tagExchange);
 }
@@ -981,26 +976,21 @@ void CouplingSchemeConfiguration::addDataToBeExchanged(
                   to, dataName, meshName, from, to);
 
     const bool requiresInitialization = exchange.requiresInitialization;
+    PRECICE_CHECK(
+        !(requiresInitialization && _participantConfig->getParticipant(from)->isDirectAccessAllowed(exchange.mesh->getID())),
+        "Participant \"{}\" cannot initialize data of the directly-accessed mesh \"{}\" from the participant\"{}\". "
+        "Either disable the initialization in the <exchange /> tag or use a locally provided mesh instead.",
+        from, meshName, to);
+
     if (from == accessor) {
       scheme.addDataToSend(exchange.data, exchange.mesh, requiresInitialization);
-      if (requiresInitialization && (_config.type == VALUE_SERIAL_EXPLICIT || _config.type == VALUE_SERIAL_IMPLICIT)) {
-        PRECICE_CHECK(not scheme.doesFirstStep(),
-                      "In serial coupling only second participant can initialize data and send it. "
-                      "Please check the <exchange data=\"{}\" mesh=\"{}\" from=\"{}\" to=\"{}\" initialize=\"{}\" /> tag in the <coupling-scheme:... /> of your precice-config.xml.",
-                      dataName, meshName, from, to, requiresInitialization);
-      }
     } else if (to == accessor) {
       scheme.addDataToReceive(exchange.data, exchange.mesh, requiresInitialization);
-      if (requiresInitialization && (_config.type == VALUE_SERIAL_EXPLICIT || _config.type == VALUE_SERIAL_IMPLICIT)) {
-        PRECICE_CHECK(scheme.doesFirstStep(),
-                      "In serial coupling only first participant can receive initial data. "
-                      "Please check the <exchange data=\"{}\" mesh=\"{}\" from=\"{}\" to=\"{}\" initialize=\"{}\" /> tag in the <coupling-scheme:... /> of your precice-config.xml.",
-                      dataName, meshName, from, to, requiresInitialization);
-      }
     } else {
       PRECICE_ASSERT(_config.type == VALUE_MULTI);
     }
   }
+  scheme.determineInitialDataExchange();
 }
 
 void CouplingSchemeConfiguration::addMultiDataToBeExchanged(
@@ -1033,6 +1023,7 @@ void CouplingSchemeConfiguration::addMultiDataToBeExchanged(
       scheme.addDataToReceive(exchange.data, exchange.mesh, initialize, from);
     }
   }
+  scheme.determineInitialDataExchange();
 }
 
 void CouplingSchemeConfiguration::checkIfDataIsExchanged(
@@ -1056,6 +1047,15 @@ void CouplingSchemeConfiguration::checkIfDataIsExchanged(
                 "Data \"{}\" is currently not exchanged over the respective mesh on which it is used for convergence measures and/or iteration acceleration. "
                 "Please check the <exchange ... /> and <...-convergence-measure ... /> tags in the <coupling-scheme:... /> of your precice-config.xml.",
                 dataName);
+}
+
+int CouplingSchemeConfiguration::getWaveformUsedOrder(std::string participantName, std::string readDataName) const
+{
+  auto participant = _participantConfig->getParticipant(participantName);
+  auto dataContext = participant->readDataContext(readDataName);
+  int  usedOrder   = dataContext.getInterpolationOrder();
+  PRECICE_ASSERT(usedOrder >= 0); // ensure that usedOrder was set
+  return usedOrder;
 }
 
 void CouplingSchemeConfiguration::checkWaveformOrderReadData(
@@ -1156,5 +1156,4 @@ void CouplingSchemeConfiguration::setParallelAcceleration(
   }
 }
 
-} // namespace cplscheme
-} // namespace precice
+} // namespace precice::cplscheme

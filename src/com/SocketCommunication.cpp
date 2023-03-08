@@ -14,8 +14,7 @@
 #include "utils/networking.hpp"
 #include "utils/span_tools.hpp"
 
-namespace precice {
-namespace com {
+namespace precice::com {
 
 namespace asio = boost::asio;
 
@@ -777,7 +776,7 @@ std::string SocketCommunication::getIpAddress()
   auto pos = std::find_if(interfaces.begin(), interfaces.end(),
                           [&](Interface const &interface) { return interface.name == _networkName; });
   if (pos == interfaces.end()) {
-    PRECICE_DEBUG("There  NOTHING");
+    PRECICE_DEBUG("There's NOTHING");
     std::ostringstream err;
     err << "Cannot find network interface \"" << _networkName << "\". Available interfaces are: ";
     for (const auto &interface : interfaces) {
@@ -795,5 +794,4 @@ std::string SocketCommunication::getIpAddress()
 #endif
 }
 
-} // namespace com
-} // namespace precice
+} // namespace precice::com

@@ -1,3 +1,4 @@
+#include <boost/test/tools/old/interface.hpp>
 #ifndef PRECICE_NO_MPI
 
 #include "testing/Testing.hpp"
@@ -26,9 +27,10 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     Eigen::VectorXd readPositions(size * 3);
     vertexIDs[0] = cplInterface.setMeshVertex(meshOneID, readPositions.data());
 
-    double maxDt   = cplInterface.initialize();
-    int    dataAID = cplInterface.getDataID("DataOne", meshOneID);
-    int    dataBID = cplInterface.getDataID("DataTwo", meshOneID);
+    int dataAID = cplInterface.getDataID("DataOne", meshOneID);
+    int dataBID = cplInterface.getDataID("DataTwo", meshOneID);
+
+    BOOST_REQUIRE(cplInterface.requiresInitialData());
 
     // writeVectorData
     writeDataA[0] = 7.0;
@@ -36,8 +38,7 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     writeDataA[2] = 7.0;
     cplInterface.writeVectorData(dataAID, vertexIDs[0], writeDataA.data());
 
-    cplInterface.markActionFulfilled(precice::constants::actionWriteInitialData());
-    cplInterface.initializeData();
+    double maxDt = cplInterface.initialize();
 
     // readBlockScalarData without waveform
     cplInterface.readBlockScalarData(dataBID, 1, vertexIDs.data(), readDataB.data());
@@ -66,11 +67,9 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     readDataB[0] = 0;
 
     while (cplInterface.isCouplingOngoing()) {
-      if (cplInterface.isActionRequired(precice::constants::actionWriteIterationCheckpoint())) {
-        cplInterface.markActionFulfilled(precice::constants::actionWriteIterationCheckpoint());
+      if (cplInterface.requiresWritingCheckpoint()) {
       }
-      if (cplInterface.isActionRequired(precice::constants::actionReadIterationCheckpoint())) {
-        cplInterface.markActionFulfilled(precice::constants::actionReadIterationCheckpoint());
+      if (cplInterface.requiresReadingCheckpoint()) {
       }
 
       // writeVectorData
@@ -121,17 +120,16 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     Eigen::VectorXd writePositions(size * 3);
     vertexIDs[0] = cplInterface.setMeshVertex(meshTwoID, writePositions.data());
 
-    double maxDt = cplInterface.initialize();
-
     int dataAID = cplInterface.getDataID("DataOne", meshTwoID);
     int dataBID = cplInterface.getDataID("DataTwo", meshTwoID);
+
+    BOOST_REQUIRE(cplInterface.requiresInitialData());
 
     // writeScalarData
     writeDataB[0] = 3.0;
     cplInterface.writeScalarData(dataBID, vertexIDs[0], writeDataB[0]);
 
-    cplInterface.markActionFulfilled(precice::constants::actionWriteInitialData());
-    cplInterface.initializeData();
+    double maxDt = cplInterface.initialize();
 
     // readBlockVectorData without waveform
     cplInterface.readBlockVectorData(dataAID, 1, vertexIDs.data(), readDataA.data());
@@ -168,11 +166,9 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     readDataA[2] = 0;
 
     while (cplInterface.isCouplingOngoing()) {
-      if (cplInterface.isActionRequired(precice::constants::actionWriteIterationCheckpoint())) {
-        cplInterface.markActionFulfilled(precice::constants::actionWriteIterationCheckpoint());
+      if (cplInterface.requiresWritingCheckpoint()) {
       }
-      if (cplInterface.isActionRequired(precice::constants::actionReadIterationCheckpoint())) {
-        cplInterface.markActionFulfilled(precice::constants::actionReadIterationCheckpoint());
+      if (cplInterface.requiresReadingCheckpoint()) {
       }
 
       // writeScalarData

@@ -18,8 +18,7 @@
 #include "xml/ConfigParser.hpp"
 #include "xml/XMLAttribute.hpp"
 
-namespace precice {
-namespace config {
+namespace precice::config {
 
 SolverInterfaceConfiguration::SolverInterfaceConfiguration(xml::XMLTag &parent)
 {
@@ -81,7 +80,7 @@ void SolverInterfaceConfiguration::xmlEndTagCallback(
           for (const std::string &neededMesh : neededMeshes.second) {
             PRECICE_CHECK(participant->isMeshUsed(neededMesh),
                           "Participant \"{}\" needs to use the mesh \"{}\" to be able to use it in the coupling scheme. "
-                          "Please either add a use-mesh tag in this participant's configuration, or use a different mesh in the coupling scheme.",
+                          "Please either add a provide-mesh or a receive-mesh tag in this participant's configuration, or use a different mesh in the coupling scheme.",
                           neededMeshes.first, neededMesh);
           }
           participantFound = true;
@@ -104,5 +103,4 @@ SolverInterfaceConfiguration::getParticipantConfiguration() const
   return _participantConfiguration;
 }
 
-} // namespace config
-} // namespace precice
+} // namespace precice::config

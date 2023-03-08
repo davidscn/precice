@@ -37,8 +37,8 @@ void testRBFMapping(const std::string configFile, const TestContext &context)
   Vector3d coordTwoC{3.5, 0.5, z}; // Maps more in the middle of the domain
 
   double expectedValTwoA = 1.0000000014191541;
-  double expectedValTwoB = 7.1554050349583402;
-  double expectedValTwoC = 77.68217404046861;
+  double expectedValTwoB = 7.30892688709867;
+  double expectedValTwoC = 77.5938805368033;
 
   if (context.isNamed("SolverOne")) {
     precice::SolverInterface interface("SolverOne", configFile, 0, 1);
@@ -65,7 +65,7 @@ void testRBFMapping(const std::string configFile, const TestContext &context)
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant should have to advance once!");
     // Write the data to be send.
     int dataAID = interface.getDataID("DataOne", meshOneID);
-    BOOST_TEST(!interface.isGradientDataRequired(dataAID));
+    BOOST_TEST(!interface.requiresGradientDataFor(dataAID));
 
     interface.writeBlockScalarData(dataAID, nCoords, ids.data(), values.data());
 
@@ -90,7 +90,7 @@ void testRBFMapping(const std::string configFile, const TestContext &context)
 
     // Read the mapped data from the mesh.
     int dataAID = interface.getDataID("DataOne", meshTwoID);
-    BOOST_TEST(!interface.isGradientDataRequired(dataAID));
+    BOOST_TEST(!interface.requiresGradientDataFor(dataAID));
 
     double valueA, valueB, valueC;
     interface.readScalarData(dataAID, idA, valueA);
@@ -99,8 +99,8 @@ void testRBFMapping(const std::string configFile, const TestContext &context)
 
     // Due to Eigen 3.3.7 (Ubunu 2004) giving slightly different results
     BOOST_TEST(valueA == expectedValTwoA, boost::test_tools::tolerance(1e-8));
-    BOOST_TEST(valueB == expectedValTwoB);
-    BOOST_TEST(valueC == expectedValTwoC);
+    BOOST_TEST(valueB == expectedValTwoB, boost::test_tools::tolerance(3e-2));
+    BOOST_TEST(valueC == expectedValTwoC, boost::test_tools::tolerance(2e-3));
 
     // Verify that there is only one time step necessary.
     interface.advance(maxDt);

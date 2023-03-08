@@ -24,6 +24,7 @@ else()
     # Use the target system name of cmake as fallback
     set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}")
   endif()
+  mark_as_advanced(LSB_RELEASE_EXE)
 endif()
 
 # General
@@ -58,7 +59,7 @@ set(CPACK_SOURCE_IGNORE_FILES
   ".gitignore"
   )
 
-# Build dependecy set
+# Build dependency set
 unset(CPACK_DEBIAN_PACKAGE_DEPENDS)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libboost-dev (>= 1.65), libboost-log-dev (>= 1.65), libboost-thread-dev (>= 1.65), libboost-system-dev (>= 1.65), libboost-filesystem-dev (>= 1.65), libboost-program-options-dev (>= 1.65), libboost-test-dev (>= 1.65), libxml2")
 if(PRECICE_PythonActions)
@@ -93,13 +94,14 @@ install(FILES tools/releasing/packaging/debian/copyright
 
 # Install lintian override
 file(WRITE "${PRECICE_PACKAGING_DIR}/lintian-override" "${CPACK_PACKAGE_NAME} binary: non-dev-pkg-with-shlib-symlink")
-install(FILES "${PRECICE_PACKAGING_DIR}/lintian-override" 
+install(FILES "${PRECICE_PACKAGING_DIR}/lintian-override"
   DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/lintian/overrides
   RENAME ${CPACK_PACKAGE_NAME}
   )
 
 # Compress and install the debian changelog
 find_program(GZIP_EXE gzip DOC "The gzip executable")
+mark_as_advanced(GZIP_EXE)
 if(GZIP_EXE)
   # Process the changelog for debian package
   message(STATUS "Compressing changelog")

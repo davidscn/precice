@@ -31,11 +31,6 @@ double SolverInterface::initialize()
   return _impl->initialize();
 }
 
-void SolverInterface::initializeData()
-{
-  _impl->initializeData();
-}
-
 double SolverInterface::advance(
     double computedTimestepLength)
 {
@@ -57,32 +52,24 @@ bool SolverInterface::isCouplingOngoing() const
   return _impl->isCouplingOngoing();
 }
 
-bool SolverInterface::isReadDataAvailable() const
-{
-  return _impl->isReadDataAvailable();
-}
-
-bool SolverInterface::isWriteDataRequired(
-    double computedTimestepLength) const
-{
-  return _impl->isWriteDataRequired(computedTimestepLength);
-}
-
 bool SolverInterface::isTimeWindowComplete() const
 {
   return _impl->isTimeWindowComplete();
 }
 
-bool SolverInterface::isActionRequired(
-    const std::string &action) const
+bool SolverInterface::requiresInitialData()
 {
-  return _impl->isActionRequired(action);
+  return _impl->requiresInitialData();
 }
 
-void SolverInterface::markActionFulfilled(
-    const std::string &action)
+bool SolverInterface::requiresReadingCheckpoint()
 {
-  _impl->markActionFulfilled(action);
+  return _impl->requiresReadingCheckpoint();
+}
+
+bool SolverInterface::requiresWritingCheckpoint()
+{
+  return _impl->requiresWritingCheckpoint();
 }
 
 bool SolverInterface::hasMesh(
@@ -97,19 +84,14 @@ int SolverInterface::getMeshID(
   return _impl->getMeshID(meshName);
 }
 
-std::set<int> SolverInterface::getMeshIDs() const
+bool SolverInterface::requiresMeshConnectivityFor(int meshID) const
 {
-  return _impl->getMeshIDs();
+  return _impl->requiresMeshConnectivityFor(meshID);
 }
 
-bool SolverInterface::isMeshConnectivityRequired(int meshID) const
+bool SolverInterface::requiresGradientDataFor(int dataID) const
 {
-  return _impl->isMeshConnectivityRequired(meshID);
-}
-
-bool SolverInterface::isGradientDataRequired(int dataID) const
-{
-  return _impl->isGradientDataRequired(dataID);
+  return _impl->requiresGradientDataFor(dataID);
 }
 
 bool SolverInterface::hasData(
@@ -122,16 +104,6 @@ int SolverInterface::getDataID(
     const std::string &dataName, int meshID) const
 {
   return _impl->getDataID(dataName, meshID);
-}
-
-bool SolverInterface::hasToEvaluateSurrogateModel() const
-{
-  return _impl->hasToEvaluateSurrogateModel();
-}
-
-bool SolverInterface::hasToEvaluateFineModel() const
-{
-  return _impl->hasToEvaluateFineModel();
 }
 
 //void SolverInterface:: resetMesh
@@ -163,69 +135,56 @@ void SolverInterface::setMeshVertices(
   _impl->setMeshVertices(meshID, size, positions, ids);
 }
 
-void SolverInterface::getMeshVertices(
-    int        meshID,
-    int        size,
-    const int *ids,
-    double *   positions) const
-{
-  _impl->getMeshVertices(meshID, size, ids, positions);
-}
-
-void SolverInterface::getMeshVertexIDsFromPositions(
-    int           meshID,
-    int           size,
-    const double *positions,
-    int *         ids) const
-{
-  _impl->getMeshVertexIDsFromPositions(meshID, size, positions, ids);
-}
-
-int SolverInterface::setMeshEdge(
+void SolverInterface::setMeshEdge(
     int meshID,
     int firstVertexID,
     int secondVertexID)
 {
-  return _impl->setMeshEdge(meshID, firstVertexID, secondVertexID);
+  _impl->setMeshEdge(meshID, firstVertexID, secondVertexID);
+}
+
+void SolverInterface::setMeshEdges(
+    int        meshID,
+    int        size,
+    const int *vertices)
+{
+  _impl->setMeshEdges(meshID, size, vertices);
 }
 
 void SolverInterface::setMeshTriangle(
-    int meshID,
-    int firstEdgeID,
-    int secondEdgeID,
-    int thirdEdgeID)
-{
-  _impl->setMeshTriangle(meshID, firstEdgeID, secondEdgeID, thirdEdgeID);
-}
-
-void SolverInterface::setMeshTriangleWithEdges(
     int meshID,
     int firstVertexID,
     int secondVertexID,
     int thirdVertexID)
 {
-  _impl->setMeshTriangleWithEdges(meshID, firstVertexID, secondVertexID, thirdVertexID);
+  _impl->setMeshTriangle(meshID, firstVertexID, secondVertexID, thirdVertexID);
+}
+
+void SolverInterface::setMeshTriangles(
+    int        meshID,
+    int        size,
+    const int *vertices)
+{
+  _impl->setMeshTriangles(meshID, size, vertices);
 }
 
 void SolverInterface::setMeshQuad(
-    int meshID,
-    int firstEdgeID,
-    int secondEdgeID,
-    int thirdEdgeID,
-    int fourthEdgeID)
-{
-  _impl->setMeshQuad(meshID, firstEdgeID, secondEdgeID, thirdEdgeID, fourthEdgeID);
-}
-
-void SolverInterface::setMeshQuadWithEdges(
     int meshID,
     int firstVertexID,
     int secondVertexID,
     int thirdVertexID,
     int fourthVertexID)
 {
-  _impl->setMeshQuadWithEdges(meshID, firstVertexID, secondVertexID, thirdVertexID,
-                              fourthVertexID);
+  _impl->setMeshQuad(meshID, firstVertexID, secondVertexID, thirdVertexID,
+                     fourthVertexID);
+}
+
+void SolverInterface::setMeshQuads(
+    int        meshID,
+    int        size,
+    const int *vertices)
+{
+  _impl->setMeshQuads(meshID, size, vertices);
 }
 
 void SolverInterface::setMeshTetrahedron(
@@ -239,16 +198,12 @@ void SolverInterface::setMeshTetrahedron(
                             fourthVertexID);
 }
 
-void SolverInterface::mapReadDataTo(
-    int toMeshID)
+void SolverInterface::setMeshTetrahedra(
+    int        meshID,
+    int        size,
+    const int *vertices)
 {
-  _impl->mapReadDataTo(toMeshID);
-}
-
-void SolverInterface::mapWriteDataFrom(
-    int fromMeshID)
-{
-  _impl->mapWriteDataFrom(fromMeshID);
+  _impl->setMeshTetrahedra(meshID, size, vertices);
 }
 
 void SolverInterface::writeBlockVectorData(
@@ -405,29 +360,5 @@ void SolverInterface::getMeshVerticesAndIDs(const int meshID,
 {
   _impl->getMeshVerticesAndIDs(meshID, size, ids, coordinates);
 }
-
-std::string getVersionInformation()
-{
-  return {precice::versionInformation};
-}
-
-namespace constants {
-
-const std::string &actionWriteInitialData()
-{
-  return cplscheme::constants::actionWriteInitialData();
-}
-
-const std::string &actionWriteIterationCheckpoint()
-{
-  return cplscheme::constants::actionWriteIterationCheckpoint();
-}
-
-const std::string &actionReadIterationCheckpoint()
-{
-  return cplscheme::constants::actionReadIterationCheckpoint();
-}
-
-} // namespace constants
 
 } // namespace precice

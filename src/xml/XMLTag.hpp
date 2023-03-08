@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -133,7 +134,16 @@ public:
   /// Adds a XML attribute by making a copy of the given attribute.
   XMLTag &addAttribute(const XMLAttribute<Eigen::VectorXd> &attribute);
 
+  /// Adds a hint for missing attributes, which will be displayed along the error message.
+  void addAttributeHint(std::string name, std::string message);
+
   bool hasAttribute(const std::string &attributeName);
+
+  template <typename Container>
+  void addSubtags(const Container &subtags)
+  {
+    std::for_each(subtags.begin(), subtags.end(), [this](auto &s) { this->addSubtag(s); });
+  }
 
   /**
    * @brief Returns name (without namespace).
@@ -162,13 +172,13 @@ public:
     return _fullName;
   }
 
-  double getDoubleAttributeValue(const std::string &name) const;
+  double getDoubleAttributeValue(const std::string &name, std::optional<double> default_value = std::nullopt) const;
 
-  int getIntAttributeValue(const std::string &name) const;
+  int getIntAttributeValue(const std::string &name, std::optional<int> default_value = std::nullopt) const;
 
-  const std::string &getStringAttributeValue(const std::string &name) const;
+  std::string getStringAttributeValue(const std::string &name, std::optional<std::string> default_value = std::nullopt) const;
 
-  bool getBooleanAttributeValue(const std::string &name) const;
+  bool getBooleanAttributeValue(const std::string &name, std::optional<bool> default_value = std::nullopt) const;
 
   const AttributeMap<double> &getDoubleAttributes() const
   {
@@ -261,6 +271,8 @@ private:
   AttributeMap<bool> _booleanAttributes;
 
   AttributeMap<Eigen::VectorXd> _eigenVectorXdAttributes;
+
+  std::map<std::string, std::string> _attributeHints;
 
   void areAllSubtagsConfigured() const;
 

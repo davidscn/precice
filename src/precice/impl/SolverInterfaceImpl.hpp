@@ -97,9 +97,6 @@ public:
   /// @copydoc SolverInterface::initialize
   double initialize();
 
-  /// @copydoc SolverInterface::initializeData
-  void initializeData();
-
   /// @copydoc SolverInterface::advance
   double advance(double computedTimestepLength);
 
@@ -117,31 +114,22 @@ public:
   /// @copydoc SolverInterface::isCouplingOngoing
   bool isCouplingOngoing() const;
 
-  /// @copydoc SolverInterface::isReadDataAvailable
-  bool isReadDataAvailable() const;
-
-  /// @copydoc SolverInterface::isWriteDataRequired
-  bool isWriteDataRequired(double computedTimestepLength) const;
-
   /// @copydoc SolverInterface::isTimeWindowComplete
   bool isTimeWindowComplete() const;
 
-  /// @copydoc SolverInterface::hasToEvaluateSurrogateModel
-  bool hasToEvaluateSurrogateModel() const;
-
-  /// @copydoc SolverInterface::hasToEvaluateFineModel
-  bool hasToEvaluateFineModel() const;
-
   ///@}
 
-  ///@name Action Methods
+  ///@name Requirements
   ///@{
 
-  /// @copydoc SolverInterface::isActionRequired
-  bool isActionRequired(const std::string &action) const;
+  /// @copydoc SolverInterface::requiresInitialData
+  bool requiresInitialData();
 
-  /// @copydoc SolverInterface::markActionFulfilled
-  void markActionFulfilled(const std::string &action);
+  /// @copydoc SolverInterface::requiresReadingCheckpoint
+  bool requiresReadingCheckpoint();
+
+  /// @copydoc SolverInterface::requiresWritingCheckpoint
+  bool requiresWritingCheckpoint();
 
   ///@}
 
@@ -158,14 +146,11 @@ public:
   /// @copydoc SolverInterface::hasMesh
   int getMeshID(const std::string &meshName) const;
 
-  /// @copydoc SolverInterface::getMeshIDs
-  std::set<int> getMeshIDs() const;
+  /// @copydoc SolverInterface::requiresMeshConnectivityFor
+  bool requiresMeshConnectivityFor(int meshID) const;
 
-  /// @copydoc SolverInterface::isMeshConnectivityRequired
-  bool isMeshConnectivityRequired(int meshID) const;
-
-  /// @copydoc SolverInterface::isGradientDataRequired
-  bool isGradientDataRequired(int dataID) const;
+  /// @copydoc SolverInterface::requiresGradientDataFor
+  bool requiresGradientDataFor(int dataID) const;
 
   /// @copydoc SolverInterface::setMeshVertex
   int setMeshVertex(
@@ -182,55 +167,44 @@ public:
       const double *positions,
       int *         ids);
 
-  /// @copydoc SolverInterface::getMeshVertices
-  void getMeshVertices(
-      int        meshID,
-      size_t     size,
-      const int *ids,
-      double *   positions) const;
-
-  /// @copydoc SolverInterface::getMeshVertexIDsFromPositions
-  void getMeshVertexIDsFromPositions(
-      int           meshID,
-      size_t        size,
-      const double *positions,
-      int *         ids) const;
-
   /// @copydoc SolverInterface::setMeshEdge
-  int setMeshEdge(
+  void setMeshEdge(
       MeshID meshID,
       int    firstVertexID,
       int    secondVertexID);
 
+  /// @copydoc SolverInterface::setMeshEdges
+  void setMeshEdges(
+      int        meshID,
+      int        size,
+      const int *vertices);
+
   /// @copydoc SolverInterface::setMeshTriangle
   void setMeshTriangle(
-      MeshID meshID,
-      int    firstEdgeID,
-      int    secondEdgeID,
-      int    thirdEdgeID);
-
-  /// @copydoc SolverInterface::setMeshTriangleWithEdges
-  void setMeshTriangleWithEdges(
       MeshID meshID,
       int    firstVertexID,
       int    secondVertexID,
       int    thirdVertexID);
 
+  /// @copydoc SolverInterface::setMeshTriangles
+  void setMeshTriangles(
+      int        meshID,
+      int        size,
+      const int *vertices);
+
   /// @copydoc SolverInterface::setMeshQuad
   void setMeshQuad(
-      MeshID meshID,
-      int    firstEdgeID,
-      int    secondEdgeID,
-      int    thirdEdgeID,
-      int    fourthEdgeID);
-
-  /// @copydoc SolverInterface::setMeshQuadWithEdges
-  void setMeshQuadWithEdges(
       MeshID meshID,
       int    firstVertexID,
       int    secondVertexID,
       int    thirdVertexID,
       int    fourthVertexID);
+
+  /// @copydoc SolverInterface::setMeshQuads
+  void setMeshQuads(
+      int        meshID,
+      int        size,
+      const int *vertices);
 
   /// @copydoc SolverInterface::setMeshTetrahedron
   void setMeshTetrahedron(
@@ -239,6 +213,12 @@ public:
       int    secondVertexID,
       int    thirdVertexID,
       int    fourthVertexID);
+
+  /// @copydoc SolverInterface::setMeshTetrahedra
+  void setMeshTetrahedra(
+      int        meshID,
+      int        size,
+      const int *vertices);
 
   ///@}
 
@@ -250,12 +230,6 @@ public:
 
   /// @copydoc SolverInterface::getDataID
   int getDataID(const std::string &dataName, MeshID meshID) const;
-
-  /// @copydoc SolverInterface::mapWriteDataFrom
-  void mapWriteDataFrom(int fromMeshID);
-
-  /// @copydoc SolverInterface::mapReadDataTo
-  void mapReadDataTo(int toMeshID);
 
   /// @copydoc SolverInterface::writeBlockVectorData
   void writeBlockVectorData(
@@ -457,11 +431,8 @@ private:
   enum struct State {
     Constructed, // Initial state of SolverInterface
     Initialized, // SolverInterface.initialize() triggers transition from State::Constructed to State::Initialized; mandatory
-    Finalized    // SolverInterface.finalize() triggers transition form State::Initialized or State::InitializedData to State::Finalized; mandatory
+    Finalized    // SolverInterface.finalize() triggers transition form State::Initialized to State::Finalized; mandatory
   };
-
-  /// SolverInterface.initializeData() triggers transition from false to true.
-  bool _hasInitializedData = false;
 
   /// Are experimental API calls allowed?
   bool _allowsExperimental = false;
@@ -536,10 +507,7 @@ private:
   void computePartitions();
 
   /// Helper for mapWrittenData and mapReadData
-  void computeMappings(const utils::ptr_vector<MappingContext> &contexts, const std::string &mappingType);
-
-  /// Helper for mapWrittenData and mapReadData
-  void clearMappings(utils::ptr_vector<MappingContext> contexts);
+  void computeMappings(std::vector<MappingContext> &contexts, const std::string &mappingType);
 
   /// Computes, performs, and resets all suitable write mappings.
   void mapWrittenData();
@@ -552,16 +520,10 @@ private:
    *
    * @param[in] timings the timings of the action.
    * @param[in] time the current total simulation time.
-   * @param[in] timeStepSize Length of last time step computed.
-   * @param[in] computedTimeWindowPart Sum of all time steps within current time window, i.e. part that is already computed.
-   * @param[in] timeWindowSize Current time window size.
    */
   void performDataActions(
       const std::set<action::Action::Timing> &timings,
-      double                                  time,
-      double                                  timeStepSize,
-      double                                  computedTimeWindowPart,
-      double                                  timeWindowSize);
+      double                                  time);
 
   /// Resets written data, displacements and mesh neighbors to export.
   void resetWrittenData();
@@ -572,6 +534,9 @@ private:
 
   /// Initializes intra-participant communication.
   void initializeIntraCommunication();
+
+  /// Advances the coupling schemes
+  void advanceCouplingScheme();
 
   /// Syncs the timestep between all ranks (all timesteps should be the same!)
   void syncTimestep(double computedTimestepLength);

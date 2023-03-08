@@ -16,12 +16,12 @@
 #include "logging/LogMacros.hpp"
 #include "math/geometry.hpp"
 #include "mesh/Data.hpp"
+#include "mesh/Vertex.hpp"
 #include "precice/types.hpp"
 #include "query/Index.hpp"
 #include "utils/EigenHelperFunctions.hpp"
 
-namespace precice {
-namespace mesh {
+namespace precice::mesh {
 
 Mesh::Mesh(
     std::string name,
@@ -94,27 +94,8 @@ Edge &Mesh::createEdge(
     Vertex &vertexOne,
     Vertex &vertexTwo)
 {
-  auto nextID = _edges.size();
-  _edges.emplace_back(vertexOne, vertexTwo, nextID);
+  _edges.emplace_back(vertexOne, vertexTwo);
   return _edges.back();
-}
-
-Edge &Mesh::createUniqueEdge(
-    Vertex &vertexOne,
-    Vertex &vertexTwo)
-{
-  const std::array<VertexID, 2> vids{vertexOne.getID(), vertexTwo.getID()};
-  const auto                    eend = edges().end();
-  auto                          pos  = std::find_if(edges().begin(), eend,
-                          [&vids](const Edge &e) -> bool {
-                            const std::array<VertexID, 2> eids{e.vertex(0).getID(), e.vertex(1).getID()};
-                            return std::is_permutation(vids.begin(), vids.end(), eids.begin());
-                          });
-  if (pos != eend) {
-    return *pos;
-  } else {
-    return createEdge(vertexOne, vertexTwo);
-  }
 }
 
 Triangle &Mesh::createTriangle(
@@ -126,8 +107,7 @@ Triangle &Mesh::createTriangle(
       edgeOne.connectedTo(edgeTwo) &&
       edgeTwo.connectedTo(edgeThree) &&
       edgeThree.connectedTo(edgeOne));
-  auto nextID = _triangles.size();
-  _triangles.emplace_back(edgeOne, edgeTwo, edgeThree, nextID);
+  _triangles.emplace_back(edgeOne, edgeTwo, edgeThree);
   return _triangles.back();
 }
 
@@ -136,8 +116,7 @@ Triangle &Mesh::createTriangle(
     Vertex &vertexTwo,
     Vertex &vertexThree)
 {
-  auto nextID = _triangles.size();
-  _triangles.emplace_back(vertexOne, vertexTwo, vertexThree, nextID);
+  _triangles.emplace_back(vertexOne, vertexTwo, vertexThree);
   return _triangles.back();
 }
 
@@ -147,9 +126,7 @@ Tetrahedron &Mesh::createTetrahedron(
     Vertex &vertexThree,
     Vertex &vertexFour)
 {
-
-  auto nextID = _tetrahedra.size();
-  _tetrahedra.emplace_back(vertexOne, vertexTwo, vertexThree, vertexFour, nextID);
+  _tetrahedra.emplace_back(vertexOne, vertexTwo, vertexThree, vertexFour);
   return _tetrahedra.back();
 }
 
@@ -225,11 +202,6 @@ bool Mesh::isValidVertexID(VertexID vertexID) const
   return (0 <= vertexID) && (static_cast<size_t>(vertexID) < vertices().size());
 }
 
-bool Mesh::isValidEdgeID(EdgeID edgeID) const
-{
-  return (0 <= edgeID) && (static_cast<size_t>(edgeID) < edges().size());
-}
-
 void Mesh::allocateDataValues()
 {
   PRECICE_TRACE(_vertices.size());
@@ -278,7 +250,7 @@ void Mesh::computeBoundingBox()
   PRECICE_TRACE(_name);
 
   // Keep the bounding box if set via the API function.
-  BoundingBox bb = _boundingBox.empty() ? BoundingBox(_dimensions) : BoundingBox(_boundingBox);
+  BoundingBox bb = _boundingBox.isDefault() ? BoundingBox(_dimensions) : BoundingBox(_boundingBox);
 
   for (const Vertex &vertex : _vertices) {
     bb.expandBy(vertex);
@@ -308,41 +280,6 @@ void Mesh::clearPartitioning()
   _vertexDistribution.clear();
   _vertexOffsets.clear();
   _globalNumberOfVertices = 0;
-}
-
-Mesh::VertexDistribution &Mesh::getVertexDistribution()
-{
-  return _vertexDistribution;
-}
-
-const Mesh::VertexDistribution &Mesh::getVertexDistribution() const
-{
-  return _vertexDistribution;
-}
-
-std::vector<int> &Mesh::getVertexOffsets()
-{
-  return _vertexOffsets;
-}
-
-const std::vector<int> &Mesh::getVertexOffsets() const
-{
-  return _vertexOffsets;
-}
-
-void Mesh::setVertexOffsets(std::vector<int> &vertexOffsets)
-{
-  _vertexOffsets = vertexOffsets;
-}
-
-int Mesh::getGlobalNumberOfVertices() const
-{
-  return _globalNumberOfVertices;
-}
-
-void Mesh::setGlobalNumberOfVertices(int num)
-{
-  _globalNumberOfVertices = num;
 }
 
 Eigen::VectorXd Mesh::getOwnedVertexData(DataID dataID)
@@ -438,6 +375,128 @@ void Mesh::expandBoundingBox(const BoundingBox &boundingBox)
   _boundingBox.expandBy(boundingBox);
 }
 
+void Mesh::preprocess()
+{
+  removeDuplicates();
+  generateImplictPrimitives();
+}
+
+void Mesh::removeDuplicates()
+{
+  // Remove duplicate tetrahedra
+  auto tetrahedraCnt = _tetrahedra.size();
+  std::sort(_tetrahedra.begin(), _tetrahedra.end());
+  auto lastTetrahedron = std::unique(_tetrahedra.begin(), _tetrahedra.end());
+  _tetrahedra          = TetraContainer{_tetrahedra.begin(), lastTetrahedron};
+
+  // Remove duplicate triangles
+  auto triangleCnt = _triangles.size();
+  std::sort(_triangles.begin(), _triangles.end());
+  auto lastTriangle = std::unique(_triangles.begin(), _triangles.end());
+  _triangles        = TriangleContainer{_triangles.begin(), lastTriangle};
+
+  // Remove duplicate edges
+  auto edgeCnt = _edges.size();
+  std::sort(_edges.begin(), _edges.end());
+  auto lastEdge = std::unique(_edges.begin(), _edges.end());
+  _edges        = EdgeContainer{_edges.begin(), lastEdge};
+
+  PRECICE_DEBUG("Compression removed {} tetrahedra ({} to {}), {} triangles ({} to {}), and {} edges ({} to {})",
+                tetrahedraCnt - _tetrahedra.size(), tetrahedraCnt, _tetrahedra.size(),
+                triangleCnt - _triangles.size(), triangleCnt, _triangles.size(),
+                edgeCnt - _edges.size(), edgeCnt, _edges.size());
+}
+
+namespace {
+
+template <class Primitive, int... Indices>
+auto sortedVertexPtrsForImpl(Primitive &p, std::integer_sequence<int, Indices...>)
+{
+  std::array<Vertex *, Primitive::vertexCount> vs{&p.vertex(Indices)...};
+  std::sort(vs.begin(), vs.end());
+  return std::tuple_cat(vs);
+}
+
+/** returns a tuple of Vertex* sorted by ptr of the Primitive
+ *
+ * This uniquely identifies a primitive, provides a weak order to allow sorting,
+ * and allows to directly fetch each Vertex to later create the primitive in the mesh.
+ *
+ * Requires Primitive to provide static constexpr vertexCount.
+ * Generates an integer sequence based on the vertexCount, which is then expanded to fill the array.
+ */
+template <class Primitive>
+auto sortedVertexPtrsFor(Primitive &p)
+{
+  return sortedVertexPtrsForImpl(p, std::make_integer_sequence<int, Primitive::vertexCount>{});
+}
+} // namespace
+
+void Mesh::generateImplictPrimitives()
+{
+  if (_triangles.empty() && _tetrahedra.empty()) {
+    PRECICE_DEBUG("No implicit primitives required");
+    return; // no implicit primitives
+  }
+
+  // count explicit primitives for debug
+  const auto explTriangles = _triangles.size();
+  const auto explEdges     = _triangles.size();
+
+  // First handle all explicit tetrahedra
+
+  // Build a set of all explicit triangles
+  using ExisitingTriangle = std::tuple<Vertex *, Vertex *, Vertex *>;
+  std::set<ExisitingTriangle> triangles;
+  for (auto &t : _triangles) {
+    triangles.insert(sortedVertexPtrsFor(t));
+  }
+
+  // Generate all missing implicit triangles of explicit tetrahedra
+  // Update the triangles set used by the implicit edge generation
+  auto createTriangleIfMissing = [&](Vertex *a, Vertex *b, Vertex *c) {
+    if (triangles.count({a, b, c}) == 0) {
+      triangles.emplace(a, b, c);
+      createTriangle(*a, *b, *c);
+    };
+  };
+  for (auto &t : _tetrahedra) {
+    auto [a, b, c, d] = sortedVertexPtrsFor(t);
+    // Make sure these are in the same order as above
+    createTriangleIfMissing(a, b, c);
+    createTriangleIfMissing(a, b, d);
+    createTriangleIfMissing(a, c, d);
+    createTriangleIfMissing(b, c, d);
+  }
+
+  // Second handle all triangles, both explicit and implicit from the tetrahedron phase
+  // Build an set of all explicit triangles
+  using ExisitingEdge = std::tuple<Vertex *, Vertex *>;
+  std::set<ExisitingEdge> edges;
+  for (auto &e : _edges) {
+    edges.emplace(sortedVertexPtrsFor(e));
+  }
+
+  // generate all missing implicit edges of implicit and explicit triangles
+  auto createEdgeIfMissing = [&](Vertex *a, Vertex *b) {
+    if (edges.count({a, b}) == 0) {
+      edges.emplace(a, b);
+      createEdge(*a, *b);
+    };
+  };
+  for (auto &t : _triangles) {
+    auto [a, b, c] = sortedVertexPtrsFor(t);
+    // Make sure these are in the same order as above
+    createEdgeIfMissing(a, b);
+    createEdgeIfMissing(a, c);
+    createEdgeIfMissing(b, c);
+  }
+
+  PRECICE_DEBUG("Generated {} implicit triangles and {} implicit edges",
+                _triangles.size() - explTriangles,
+                _edges.size() - explEdges);
+}
+
 bool Mesh::operator==(const Mesh &other) const
 {
   bool equal = true;
@@ -479,5 +538,4 @@ std::ostream &operator<<(std::ostream &os, const Mesh &m)
   return os;
 }
 
-} // namespace mesh
-} // namespace precice
+} // namespace precice::mesh

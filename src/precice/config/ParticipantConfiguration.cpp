@@ -29,14 +29,12 @@
 #include "precice/impl/WatchIntegral.hpp"
 #include "precice/impl/WatchPoint.hpp"
 #include "utils/IntraComm.hpp"
-#include "utils/PointerVector.hpp"
 #include "utils/assertion.hpp"
 #include "utils/networking.hpp"
 #include "xml/ConfigParser.hpp"
 #include "xml/XMLAttribute.hpp"
 
-namespace precice {
-namespace config {
+namespace precice::config {
 
 ParticipantConfiguration::ParticipantConfiguration(
     xml::XMLTag &              parent,
@@ -129,25 +127,22 @@ ParticipantConfiguration::ParticipantConfiguration(
   tagWatchIntegral.addAttribute(attrScaleWitConn);
   tag.addSubtag(tagWatchIntegral);
 
-  XMLTag tagUseMesh(*this, TAG_USE_MESH, XMLTag::OCCUR_ARBITRARY);
-  doc = "Makes a mesh (see tag <mesh> available to a participant.";
-  tagUseMesh.setDocumentation(doc);
-  attrName.setDocumentation("Name of the mesh.");
-  tagUseMesh.addAttribute(attrName);
-  //  XMLAttribute<Eigen::VectorXd> attrLocalOffset(ATTR_LOCAL_OFFSET);
-  //  doc = "The mesh can have an offset only applied for the local participant. ";
-  //  doc += "Vector-valued example: '1.0; 0.0; 0.0'";
-  //  attrLocalOffset.setDocumentation(doc);
-  //  attrLocalOffset.setDefaultValue(Eigen::VectorXd::Constant(3, 0));
-  //  tagUseMesh.addAttribute(attrLocalOffset);
+  XMLTag tagProvideMesh(*this, TAG_PROVIDE_MESH, XMLTag::OCCUR_ARBITRARY);
+  doc = "Provide a mesh (see tag <mesh>) to other participants.";
+  tagProvideMesh.setDocumentation(doc);
+  attrName.setDocumentation("Name of the mesh to provide.");
+  tagProvideMesh.addAttribute(attrName);
+  tag.addSubtag(tagProvideMesh);
 
-  auto attrFrom = XMLAttribute<std::string>(ATTR_FROM, "")
-                      .setDocumentation(
-                          "If a created mesh should be used by "
-                          "another solver, this attribute has to specify the creating participant's"
-                          " name. The creator has to use the attribute \"provide\" to signal he is "
-                          "providing the mesh geometry.");
-  tagUseMesh.addAttribute(attrFrom);
+  XMLTag tagReceiveMesh(*this, TAG_RECEIVE_MESH, XMLTag::OCCUR_ARBITRARY);
+  doc = "Makes a remote mesh (see tag <mesh>) available to this participant.";
+  tagReceiveMesh.setDocumentation(doc);
+  attrName.setDocumentation("Name of the mesh to receive.");
+  tagReceiveMesh.addAttribute(attrName);
+  auto attrFrom = XMLAttribute<std::string>(ATTR_FROM)
+                      .setDocumentation("The name of the participant to receive the mesh from. "
+                                        "This participant needs to provide the mesh using <provide-mesh />.");
+  tagReceiveMesh.addAttribute(attrFrom);
   auto attrSafetyFactor = makeXMLAttribute(ATTR_SAFETY_FACTOR, 0.5)
                               .setDocumentation(
                                   "If a mesh is received from another partipant (see tag <from>), it needs to be"
@@ -155,22 +150,22 @@ ParticipantConfiguration::ParticipantConfiguration(
                                   "a geometric filter (see tag <geometric-filter>), i.e. filtering by bounding boxes around the local mesh, can be used. "
                                   "This safety factor defines by which factor this local information is "
                                   "increased. An example: 0.5 means that the bounding box is 150% of its original size.");
-  tagUseMesh.addAttribute(attrSafetyFactor);
+  tagReceiveMesh.addAttribute(attrSafetyFactor);
 
   auto attrGeoFilter = XMLAttribute<std::string>(ATTR_GEOMETRIC_FILTER)
                            .setDocumentation(
                                "If a mesh is received from another partipant (see tag <from>), it needs to be"
                                "decomposed at the receiving participant. To speed up this process, "
                                "a geometric filter, i.e. filtering by bounding boxes around the local mesh, can be used. "
-                               "Two different variants are implemented: a filter \"on-master\" strategy, "
+                               "Two different variants are implemented: a filter \"on-primary\" strategy, "
                                "which is beneficial for a huge mesh and a low number of processors, and a filter "
-                               "\"on-slaves\" strategy, which performs better for a very high number of "
+                               "\"on-secondary\" strategy, which performs better for a very high number of "
                                "processors. Both result in the same distribution (if the safety factor is sufficiently large). "
-                               "\"on-master\" is not supported if you use two-level initialization. "
+                               "\"on-primary\" is not supported if you use two-level initialization. "
                                "For very asymmetric cases, the filter can also be switched off completely (\"no-filter\").")
-                           .setOptions({VALUE_FILTER_ON_MASTER, VALUE_FILTER_ON_SLAVES, VALUE_NO_FILTER, VALUE_FILTER_ON_PRIMARY_RANK, VALUE_FILTER_ON_SECONDARY_RANKS})
+                           .setOptions({VALUE_NO_FILTER, VALUE_FILTER_ON_PRIMARY_RANK, VALUE_FILTER_ON_SECONDARY_RANKS})
                            .setDefaultValue(VALUE_FILTER_ON_SECONDARY_RANKS);
-  tagUseMesh.addAttribute(attrGeoFilter);
+  tagReceiveMesh.addAttribute(attrGeoFilter);
 
   auto attrDirectAccess = makeXMLAttribute(ATTR_DIRECT_ACCESS, false)
                               .setDocumentation(
@@ -182,77 +177,69 @@ ParticipantConfiguration::ParticipantConfiguration(
                                   "mesh, since no mesh needs to be provided by the participant. For this purpose, bounding "
                                   "boxes can be defined (see API function \"setMeshAccessRegion\") and used by selecting "
                                   "the option direct-access=\"true\".");
+  tagReceiveMesh.addAttribute(attrDirectAccess);
 
-  tagUseMesh.addAttribute(attrDirectAccess);
-
-  auto attrProvide = makeXMLAttribute(ATTR_PROVIDE, false)
-                         .setDocumentation(
-                             "If this attribute is set to \"on\", the "
-                             "participant has to create the mesh geometry before initializing preCICE.");
-  tagUseMesh.addAttribute(attrProvide);
-  tag.addSubtag(tagUseMesh);
+  tag.addSubtag(tagReceiveMesh);
 
   std::list<XMLTag>  intraCommTags;
   XMLTag::Occurrence intraCommOcc = XMLTag::OCCUR_NOT_OR_ONCE;
-  for (std::string tag_name : {TAG_MASTER, TAG_INTRA_COMM}) {
-    {
-      XMLTag tagIntraComm(*this, "sockets", intraCommOcc, tag_name);
-      doc = "A solver in parallel needs a communication between its ranks. ";
-      doc += "By default, the participant's MPI_COM_WORLD is reused.";
-      doc += "Use this tag to use TCP/IP sockets instead.";
-      tagIntraComm.setDocumentation(doc);
+  {
+    XMLTag tagIntraComm(*this, "sockets", intraCommOcc, TAG_INTRA_COMM);
+    doc = "A solver in parallel needs a communication between its ranks. ";
+    doc += "By default, the participant's MPI_COM_WORLD is reused.";
+    doc += "Use this tag to use TCP/IP sockets instead.";
+    tagIntraComm.setDocumentation(doc);
 
-      auto attrPort = makeXMLAttribute("port", 0)
-                          .setDocumentation(
-                              "Port number (16-bit unsigned integer) to be used for socket "
-                              "communication. The default is \"0\", what means that OS will "
-                              "dynamically search for a free port (if at least one exists) and "
-                              "bind it automatically.");
-      tagIntraComm.addAttribute(attrPort);
+    auto attrPort = makeXMLAttribute("port", 0)
+                        .setDocumentation(
+                            "Port number (16-bit unsigned integer) to be used for socket "
+                            "communication. The default is \"0\", what means that OS will "
+                            "dynamically search for a free port (if at least one exists) and "
+                            "bind it automatically.");
+    tagIntraComm.addAttribute(attrPort);
 
-      auto attrNetwork = makeXMLAttribute(ATTR_NETWORK, utils::networking::loopbackInterfaceName())
-                             .setDocumentation(
-                                 "Interface name to be used for socket communication. "
-                                 "Default is the canonical name of the loopback interface of your platform. "
-                                 "Might be different on supercomputing systems, e.g. \"ib0\" "
-                                 "for the InfiniBand on SuperMUC. ");
-      tagIntraComm.addAttribute(attrNetwork);
+    auto attrNetwork = makeXMLAttribute(ATTR_NETWORK, utils::networking::loopbackInterfaceName())
+                           .setDocumentation(
+                               "Interface name to be used for socket communication. "
+                               "Default is the canonical name of the loopback interface of your platform. "
+                               "Might be different on supercomputing systems, e.g. \"ib0\" "
+                               "for the InfiniBand on SuperMUC. ");
+    tagIntraComm.addAttribute(attrNetwork);
 
-      auto attrExchangeDirectory = makeXMLAttribute(ATTR_EXCHANGE_DIRECTORY, "")
-                                       .setDocumentation(
-                                           "Directory where connection information is exchanged. By default, the "
-                                           "directory of startup is chosen.");
-      tagIntraComm.addAttribute(attrExchangeDirectory);
+    auto attrExchangeDirectory = makeXMLAttribute(ATTR_EXCHANGE_DIRECTORY, "")
+                                     .setDocumentation(
+                                         "Directory where connection information is exchanged. By default, the "
+                                         "directory of startup is chosen.");
+    tagIntraComm.addAttribute(attrExchangeDirectory);
 
-      intraCommTags.push_back(tagIntraComm);
-    }
-    {
-      XMLTag tagIntraComm(*this, "mpi", intraCommOcc, tag_name);
-      doc = "A solver in parallel needs a communication between its ranks. ";
-      doc += "By default, the participant's MPI_COM_WORLD is reused.";
-      doc += "Use this tag to use MPI with separated communication spaces instead instead.";
-      tagIntraComm.setDocumentation(doc);
+    intraCommTags.push_back(tagIntraComm);
+  }
+  {
+    XMLTag tagIntraComm(*this, "mpi", intraCommOcc, TAG_INTRA_COMM);
+    doc = "A solver in parallel needs a communication between its ranks. ";
+    doc += "By default, the participant's MPI_COM_WORLD is reused.";
+    doc += "Use this tag to use MPI with separated communication spaces instead instead.";
+    tagIntraComm.setDocumentation(doc);
 
-      auto attrExchangeDirectory = makeXMLAttribute(ATTR_EXCHANGE_DIRECTORY, "")
-                                       .setDocumentation(
-                                           "Directory where connection information is exchanged. By default, the "
-                                           "directory of startup is chosen.");
-      tagIntraComm.addAttribute(attrExchangeDirectory);
+    auto attrExchangeDirectory = makeXMLAttribute(ATTR_EXCHANGE_DIRECTORY, "")
+                                     .setDocumentation(
+                                         "Directory where connection information is exchanged. By default, the "
+                                         "directory of startup is chosen.");
+    tagIntraComm.addAttribute(attrExchangeDirectory);
 
-      intraCommTags.push_back(tagIntraComm);
-    }
-    {
-      XMLTag tagIntraComm(*this, "mpi-single", intraCommOcc, tag_name);
-      doc = "A solver in parallel needs a communication between its ranks. ";
-      doc += "By default (which is this option), the participant's MPI_COM_WORLD is reused.";
-      doc += "This tag is only used to ensure backwards compatibility.";
-      tagIntraComm.setDocumentation(doc);
+    intraCommTags.push_back(tagIntraComm);
+  }
+  {
+    XMLTag tagIntraComm(*this, "mpi-single", intraCommOcc, TAG_INTRA_COMM);
+    doc = "A solver in parallel needs a communication between its ranks. ";
+    doc += "By default (which is this option), the participant's MPI_COM_WORLD is reused.";
+    doc += "This tag is only used to ensure backwards compatibility.";
+    tagIntraComm.setDocumentation(doc);
 
-      intraCommTags.push_back(tagIntraComm);
-    }
-    for (XMLTag &tagIntraComm : intraCommTags) {
-      tag.addSubtag(tagIntraComm);
-    }
+    intraCommTags.push_back(tagIntraComm);
+  }
+  for (XMLTag &tagIntraComm : intraCommTags) {
+    tag.addSubtag(tagIntraComm);
   }
   parent.addSubtag(tag);
 }
@@ -280,16 +267,35 @@ void ParticipantConfiguration::xmlTagCallback(
     const std::string &  name = tag.getStringAttributeValue(ATTR_NAME);
     impl::PtrParticipant p(new impl::Participant(name, _meshConfig));
     _participants.push_back(p);
-  } else if (tag.getName() == TAG_USE_MESH) {
+  } else if (tag.getName() == TAG_PROVIDE_MESH) {
     PRECICE_ASSERT(_dimensions != 0); // setDimensions() has been called
-    std::string     name = tag.getStringAttributeValue(ATTR_NAME);
-    Eigen::VectorXd offset(_dimensions);
-    /// @todo offset currently not supported
-    //offset = tag.getEigenVectorXdAttributeValue(ATTR_LOCAL_OFFSET, _dimensions);
+    std::string name = tag.getStringAttributeValue(ATTR_NAME);
+
+    mesh::PtrMesh mesh = _meshConfig->getMesh(name);
+    PRECICE_CHECK(mesh,
+                  R"(Participant "{}" attempts to provide an unknown mesh "{}". <mesh name="{}"> needs to be defined first.)",
+                  _participants.back()->getName(), name, name);
+
+    _participants.back()->provideMesh(mesh);
+  } else if (tag.getName() == TAG_RECEIVE_MESH) {
+    PRECICE_ASSERT(_dimensions != 0); // setDimensions() has been called
+    std::string                                   name              = tag.getStringAttributeValue(ATTR_NAME);
     std::string                                   from              = tag.getStringAttributeValue(ATTR_FROM);
     double                                        safetyFactor      = tag.getDoubleAttributeValue(ATTR_SAFETY_FACTOR);
     partition::ReceivedPartition::GeometricFilter geoFilter         = getGeoFilter(tag.getStringAttributeValue(ATTR_GEOMETRIC_FILTER));
     const bool                                    allowDirectAccess = tag.getBooleanAttributeValue(ATTR_DIRECT_ACCESS);
+
+    // Start with defining the mesh
+    mesh::PtrMesh mesh = _meshConfig->getMesh(name);
+    PRECICE_CHECK(mesh,
+                  R"(Participant "{}" attempts to provide an unknown mesh "{}". <mesh name="{}"> needs to be defined first.)",
+                  _participants.back()->getName(), name, name);
+
+    // Then check the attributes
+    PRECICE_CHECK(!from.empty(),
+                  R"(Participant "{}" receives mesh "{}", but doesn't specify where from. )"
+                  "Please add the name of the other participant to the receive-mesh tag: <receive-mesh name=\"{}\" from=\"(other participant)\" ... />",
+                  context.name, name, name)
 
     if (allowDirectAccess) {
       if (!_experimental) {
@@ -298,45 +304,24 @@ void ParticipantConfiguration::xmlTagCallback(
       PRECICE_WARN("You configured the received mesh \"{}\" to use the option access-direct=\"true\", which is currently still experimental. Use with care.", name);
     }
 
+    PRECICE_CHECK(_participants.back()->getName() != from,
+                  "Participant \"{}\" cannot receive mesh \"{}\" from itself. "
+                  "To provide a mesh, use <provide-mesh name=\"{}\" /> instead.",
+                  context.name, name, name);
+
     PRECICE_CHECK(safetyFactor >= 0,
-                  "Participant \"{}\" uses mesh \"{}\" with safety-factor=\"{}\". "
+                  "Participant \"{}\" receives mesh \"{}\" with safety-factor=\"{}\". "
                   "Please use a positive or zero safety-factor instead.",
                   context.name, name, safetyFactor);
 
-    bool provide = tag.getBooleanAttributeValue(ATTR_PROVIDE);
-    if (_participants.back()->getName() == from) {
-      PRECICE_CHECK(provide,
-                    "Participant \"{}\" cannot use mesh \"{}\" from itself. "
-                    "Use the \"from\"-field to specify which participant has to communicate the mesh to \"{}\".",
-                    context.name, name, context.name);
-    }
-    mesh::PtrMesh mesh = _meshConfig->getMesh(name);
-    PRECICE_CHECK(mesh,
-                  "Participant \"{}\" uses mesh \"{}\" which is not defined. "
-                  "Please check the use-mesh node with name=\"{}\" or define the mesh.",
-                  _participants.back()->getName(), name, name);
-    if ((geoFilter != partition::ReceivedPartition::GeometricFilter::ON_SECONDARY_RANKS || safetyFactor != 0.5) && from == "") {
-      PRECICE_ERROR(
-          "Participant \"{}\" uses mesh \"{}\", which is not received (no \"from\"), but has a geometric-filter and/or a safety factor defined. "
-          "Please extend the use-mesh tag as follows: <use-mesh name=\"{}\" from=\"(other participant)\" />",
-          _participants.back()->getName(), name, name);
-    }
-
-    PRECICE_CHECK(!(allowDirectAccess && from.empty()),
-                  "Participant \"{}\" uses mesh \"{}\", which is not received (no \"from\"), but has a direct access defined. "
-                  "This combination of options is not allowed. "
-                  "Please extend the use-mesh tag as follows: <use-mesh name=\"{}\" from=\"(other participant)\" />"
-                  " or remove the direct access option.",
-                  _participants.back()->getName(), name, name);
-
-    _participants.back()->useMesh(mesh, offset, false, from, safetyFactor, provide, geoFilter, allowDirectAccess);
+    _participants.back()->receiveMesh(mesh, from, safetyFactor, geoFilter, allowDirectAccess);
   } else if (tag.getName() == TAG_WRITE) {
     const std::string &dataName = tag.getStringAttributeValue(ATTR_NAME);
     std::string        meshName = tag.getStringAttributeValue(ATTR_MESH);
     mesh::PtrMesh      mesh     = _meshConfig->getMesh(meshName);
     PRECICE_CHECK(mesh,
-                  "Participant \"{}\" has to use mesh \"{}\" in order to write data to it. Please add a use-mesh node with name=\"{}\".",
-                  _participants.back()->getName(), meshName, meshName);
+                  R"(Participant "{}" attempts to read data "{}" from an unknown mesh "{}". <mesh name="{}"> needs to be defined first.)",
+                  _participants.back()->getName(), dataName, meshName, meshName);
     mesh::PtrData data = getData(mesh, dataName);
     _participants.back()->addWriteData(data, mesh);
   } else if (tag.getName() == TAG_READ) {
@@ -344,8 +329,8 @@ void ParticipantConfiguration::xmlTagCallback(
     std::string        meshName = tag.getStringAttributeValue(ATTR_MESH);
     mesh::PtrMesh      mesh     = _meshConfig->getMesh(meshName);
     PRECICE_CHECK(mesh,
-                  "Participant \"{}\" has to use mesh \"{}\" in order to read data from it. Please add a use-mesh node with name=\"{}\".",
-                  _participants.back()->getName(), meshName, meshName);
+                  R"(Participant "{}" attempts to write data "{}" to an unknown mesh "{}". <mesh name="{}"> needs to be defined first.)",
+                  _participants.back()->getName(), dataName, meshName, meshName);
     mesh::PtrData data          = getData(mesh, dataName);
     int           waveformOrder = tag.getIntAttributeValue(ATTR_ORDER);
     if (waveformOrder != time::Time::DEFAULT_INTERPOLATION_ORDER) {
@@ -372,10 +357,7 @@ void ParticipantConfiguration::xmlTagCallback(
     config.nameMesh    = tag.getStringAttributeValue(ATTR_MESH);
     config.isScalingOn = tag.getBooleanAttributeValue(ATTR_SCALE_WITH_CONN);
     _watchIntegralConfigs.push_back(config);
-  } else if (tag.getNamespace() == TAG_MASTER || tag.getNamespace() == TAG_INTRA_COMM) {
-    if (tag.getNamespace() == TAG_MASTER) {
-      PRECICE_WARN("Tag \"{}\" is deprecated and will be removed in v3.0.0. Please use \"{}\".", TAG_MASTER, TAG_INTRA_COMM);
-    }
+  } else if (tag.getNamespace() == TAG_INTRA_COMM) {
     com::CommunicationConfiguration comConfig;
     com::PtrCommunication           com  = comConfig.createCommunication(tag);
     utils::IntraComm::getCommunication() = com;
@@ -399,17 +381,19 @@ ParticipantConfiguration::getParticipants() const
   return _participants;
 }
 
+const impl::PtrParticipant ParticipantConfiguration::getParticipant(const std::string &participantName) const
+{
+  auto participant = std::find_if(_participants.begin(), _participants.end(), [&participantName](const auto &p) { return p->getName() == participantName; });
+  PRECICE_ASSERT(participant != _participants.end(), "Did not find participant \"{}\"", participantName);
+
+  return *participant;
+}
+
 partition::ReceivedPartition::GeometricFilter ParticipantConfiguration::getGeoFilter(const std::string &geoFilter) const
 {
-  if (geoFilter == VALUE_FILTER_ON_MASTER || geoFilter == VALUE_FILTER_ON_PRIMARY_RANK) {
-    if (geoFilter == VALUE_FILTER_ON_MASTER) {
-      PRECICE_WARN("Value \"{}\" is deprecated and will be removed in v3.0.0. Please use \"{}\"", VALUE_FILTER_ON_MASTER, VALUE_FILTER_ON_PRIMARY_RANK);
-    }
+  if (geoFilter == VALUE_FILTER_ON_PRIMARY_RANK) {
     return partition::ReceivedPartition::GeometricFilter::ON_PRIMARY_RANK;
-  } else if (geoFilter == VALUE_FILTER_ON_SLAVES || geoFilter == VALUE_FILTER_ON_SECONDARY_RANKS) {
-    if (geoFilter == VALUE_FILTER_ON_SLAVES) {
-      PRECICE_WARN("Value \"{}\" is deprecated and will be removed in v3.0.0. Please use \"{}\".", VALUE_FILTER_ON_SLAVES, VALUE_FILTER_ON_SECONDARY_RANKS);
-    }
+  } else if (geoFilter == VALUE_FILTER_ON_SECONDARY_RANKS) {
     return partition::ReceivedPartition::GeometricFilter::ON_SECONDARY_RANKS;
   } else {
     PRECICE_ASSERT(geoFilter == VALUE_NO_FILTER);
@@ -440,21 +424,30 @@ void ParticipantConfiguration::finishParticipantConfiguration(
 
     checkIllDefinedMappings(confMapping, participant);
 
-    int fromMeshID = confMapping.fromMesh->getID();
-    int toMeshID   = confMapping.toMesh->getID();
+    auto fromMesh = confMapping.fromMesh->getName();
+    auto toMesh   = confMapping.toMesh->getName();
 
-    PRECICE_CHECK(participant->isMeshUsed(fromMeshID),
-                  "Participant \"{}\" has mapping from mesh \"{}\", without using this mesh. "
-                  "Please add a use-mesh tag with name=\"{}\"",
-                  participant->getName(), confMapping.fromMesh->getName(), confMapping.fromMesh->getName());
-    PRECICE_CHECK(participant->isMeshUsed(toMeshID),
-                  "Participant \"{}\" has mapping to mesh \"{}\", without using this mesh. "
-                  "Please add a use-mesh tag with name=\"{}\"",
-                  participant->getName(), confMapping.toMesh->getName(), confMapping.toMesh->getName());
-    PRECICE_CHECK((participant->isMeshProvided(fromMeshID) || participant->isMeshProvided(toMeshID)),
-                  "Participant \"{}\" has mapping from mesh \"{}\",  to mesh \"{}\", but neither are provided. "
-                  "Please mark the mesh provided by this participant by configuring its use-mesh tag with provided=\"true\".",
-                  participant->getName(), confMapping.fromMesh->getName(), confMapping.toMesh->getName());
+    if (confMapping.direction == mapping::MappingConfiguration::Direction::READ) {
+      /// A read mapping maps from received to provided
+      PRECICE_CHECK(participant->isMeshReceived(fromMesh),
+                    "Participant \"{}\" has a read mapping from mesh \"{}\", without receiving it. "
+                    "Please add a receive-mesh tag with name=\"{}\"",
+                    participant->getName(), fromMesh, fromMesh);
+      PRECICE_CHECK(participant->isMeshProvided(toMesh),
+                    "Participant \"{}\" has a read mapping to mesh \"{}\", without providing it. "
+                    "Please add a provide-mesh tag with name=\"{}\"",
+                    participant->getName(), toMesh, toMesh);
+    } else {
+      // A write mapping maps from provided to received
+      PRECICE_CHECK(participant->isMeshProvided(fromMesh),
+                    "Participant \"{}\" has a write mapping from mesh \"{}\", without providing it. "
+                    "Please add a provided-mesh tag with name=\"{}\"",
+                    participant->getName(), fromMesh, fromMesh);
+      PRECICE_CHECK(participant->isMeshReceived(toMesh),
+                    "Participant \"{}\" has a write mapping to mesh \"{}\", without receiving it. "
+                    "Please add a receive-mesh tag with name=\"{}\"",
+                    participant->getName(), toMesh, toMesh);
+    }
 
     if (context.size > 1) {
       if ((confMapping.direction == mapping::MappingConfiguration::WRITE &&
@@ -462,46 +455,48 @@ void ParticipantConfiguration::finishParticipantConfiguration(
           (confMapping.direction == mapping::MappingConfiguration::READ &&
            confMapping.mapping->getConstraint() == mapping::Mapping::CONSERVATIVE)) {
         PRECICE_ERROR("For a parallel participant, only the mapping combinations read-consistent and write-conservative are allowed");
-      } else if (confMapping.mapping->getConstraint() == mapping::Mapping::SCALEDCONSISTENT) {
+      } else if (confMapping.mapping->isScaledConsistent()) {
         PRECICE_ERROR("Scaled consistent mapping is not yet supported for a parallel participant. "
                       "You could run in serial or use a plain (read-)consistent mapping instead.");
       }
     }
 
+    auto               fromMeshID      = confMapping.fromMesh->getID();
+    auto               toMeshID        = confMapping.toMesh->getID();
     impl::MeshContext &fromMeshContext = participant->meshContext(fromMeshID);
     impl::MeshContext &toMeshContext   = participant->meshContext(toMeshID);
 
     if (confMapping.direction == mapping::MappingConfiguration::READ) {
       PRECICE_CHECK(toMeshContext.provideMesh,
-                    "A read mapping of participant \"{}\" needs to map TO a provided mesh. Mesh \"{}\" is not provided. "
-                    "Please add a provide=\"yes\" attribute to the participant's use-mesh tag.",
+                    "A read mapping of participant \"{}\" needs to map TO a provided mesh. Mesh \"{1}\" is not provided. "
+                    "Please add the tag <provide-mesh name=\"{1}\" /> to the participant.",
                     participant->getName(), confMapping.toMesh->getName());
       PRECICE_CHECK(not fromMeshContext.receiveMeshFrom.empty(),
-                    "A read mapping of participant \"{}\" needs to map FROM a received mesh. Mesh \"{}\" is not received. "
-                    "Please add a from=\"(participant)\" attribute to the participant's use-mesh tag.",
-                    participant->getName(), confMapping.fromMesh->getName());
+                    "A read mapping of participant \"{}\" needs to map FROM a received mesh. Mesh \"{1}\" is not received. "
+                    "Please add the tag <receive-mesh name=\"{1}\" /> to the participant.",
+                    participant->getName(), confMapping.toMesh->getName());
     } else {
       PRECICE_CHECK(fromMeshContext.provideMesh,
-                    "A write mapping of participant \"{}\" needs to map FROM a provided mesh. Mesh \"{}\" is not provided. "
-                    "Please add a provide=\"yes\" attribute to the participant's use-mesh tag.",
+                    "A write mapping of participant \"{}\" needs to map FROM a provided mesh. Mesh \"{1}\" is not provided. "
+                    "Please add the tag <provide-mesh name=\"{1}\" /> to the participant.",
                     participant->getName(), confMapping.fromMesh->getName());
       PRECICE_CHECK(not toMeshContext.receiveMeshFrom.empty(),
-                    "A write mapping of participant \"{}\" needs to map TO a received mesh. Mesh \"{}\" is not received. "
-                    "Please add a from=\"(participant)\" attribute to the participant's use-mesh tag.",
+                    "A write mapping of participant \"{}\" needs to map TO a received mesh. Mesh \"{1}\" is not received. "
+                    "Please add the tag <receive-mesh name=\"{1}\" /> to the participant.",
                     participant->getName(), confMapping.toMesh->getName());
     }
 
-    if (confMapping.isRBF) {
+    // @TODO: is this still correct?
+    if (confMapping.requiresBasisFunction) {
       fromMeshContext.geoFilter = partition::ReceivedPartition::GeometricFilter::NO_FILTER;
       toMeshContext.geoFilter   = partition::ReceivedPartition::GeometricFilter::NO_FILTER;
     }
 
-    precice::impl::MappingContext *mappingContext = new precice::impl::MappingContext();
-    mappingContext->fromMeshID                    = fromMeshID;
-    mappingContext->toMeshID                      = toMeshID;
-    mappingContext->timing                        = confMapping.timing;
+    precice::impl::MappingContext mappingContext;
+    mappingContext.fromMeshID = fromMeshID;
+    mappingContext.toMeshID   = toMeshID;
 
-    mapping::PtrMapping &map = mappingContext->mapping;
+    mapping::PtrMapping &map = mappingContext.mapping;
     PRECICE_ASSERT(map.get() == nullptr);
     map = confMapping.mapping;
 
@@ -522,8 +517,8 @@ void ParticipantConfiguration::finishParticipantConfiguration(
     toMeshContext.meshRequirement = std::max(
         toMeshContext.meshRequirement, map->getOutputRequirement());
 
-    fromMeshContext.fromMappingContexts.push_back(*mappingContext);
-    toMeshContext.toMappingContexts.push_back(*mappingContext);
+    fromMeshContext.fromMappingContexts.push_back(mappingContext);
+    toMeshContext.toMappingContexts.push_back(mappingContext);
   }
   _mappingConfig->resetMappings();
 
@@ -542,8 +537,8 @@ void ParticipantConfiguration::finishParticipantConfiguration(
         if (meshContext.mesh->hasDataName(dataContext.getDataName())) {
           // Check, if the fromMesh is a provided mesh
           PRECICE_CHECK(participant->isMeshProvided(fromMeshID),
-                        "Participant \"{}\" has to use and provide mesh \"{}\" to be able to write data to it. "
-                        "Please add a use-mesh node with name=\"{}\" and provide=\"true\".",
+                        "Participant \"{}\" has to provide mesh \"{}\" to be able to write data to it. "
+                        "Please add a provide-mesh node with name=\"{}\".",
                         participant->getName(), dataContext.getMeshName(), dataContext.getMeshName());
           dataContext.appendMappingConfiguration(mappingContext, meshContext);
           // Enable gradient data if required
@@ -576,8 +571,8 @@ void ParticipantConfiguration::finishParticipantConfiguration(
         if (meshContext.mesh->hasDataName(dataContext.getDataName())) {
           // Check, if the toMesh is a provided mesh
           PRECICE_CHECK(participant->isMeshProvided(toMeshID),
-                        "Participant \"{}\" has to use and provide mesh \"{}\" in order to read data from it. "
-                        "Please add a use-mesh node with name=\"{}\" and provide=\"true\".",
+                        "Participant \"{}\" has to provide mesh \"{}\" in order to read data from it. "
+                        "Please add a provide-mesh node with name=\"{}\".",
                         participant->getName(), dataContext.getMeshName(), dataContext.getMeshName());
           dataContext.appendMappingConfiguration(mappingContext, meshContext);
           // Enable gradient data if required
@@ -600,7 +595,7 @@ void ParticipantConfiguration::finishParticipantConfiguration(
     bool used = _participants.back()->isMeshUsed(action->getMesh()->getID());
     PRECICE_CHECK(used,
                   "Data action of participant \"{}\" uses mesh \"{}\", which is not used by the participant. "
-                  "Please add a use-mesh node with name=\"{}\".",
+                  "Please add a provide-mesh or receive-mesh node with name=\"{}\".",
                   _participants.back()->getName(), action->getMesh()->getName(), action->getMesh()->getName());
   }
   for (action::PtrAction &action : _actionConfig->extractActions()) {
@@ -643,8 +638,8 @@ void ParticipantConfiguration::finishParticipantConfiguration(
   // Create watch points
   for (const WatchPointConfig &config : _watchPointConfigs) {
     PRECICE_CHECK(participant->isMeshUsed(config.nameMesh),
-                  "Participant \"{}\" defines watchpoint \"{}\" for mesh \"{}\" which is not used by the participant. "
-                  "Please add a use-mesh node with name=\"{}\".",
+                  "Participant \"{}\" defines watchpoint \"{}\" for mesh \"{}\" which is not provided by the participant. "
+                  "Please add <provide-mesh name=\"{}\" /> to the participant.",
                   participant->getName(), config.name, config.nameMesh, config.nameMesh);
     const auto &meshContext = participant->usedMeshContext(config.nameMesh);
     PRECICE_CHECK(meshContext.provideMesh,
@@ -662,7 +657,7 @@ void ParticipantConfiguration::finishParticipantConfiguration(
   for (const WatchIntegralConfig &config : _watchIntegralConfigs) {
     PRECICE_CHECK(participant->isMeshUsed(config.nameMesh),
                   "Participant \"{}\" defines watch integral \"{}\" for mesh \"{}\" which is not used by the participant. "
-                  "Please add a use-mesh node with name=\"{}\".",
+                  "Please add a provide-mesh node with name=\"{}\".",
                   participant->getName(), config.name, config.nameMesh, config.nameMesh);
     const auto &meshContext = participant->usedMeshContext(config.nameMesh);
     PRECICE_CHECK(meshContext.provideMesh,
@@ -739,5 +734,4 @@ void ParticipantConfiguration::checkIllDefinedMappings(
   }
 }
 
-} // namespace config
-} // namespace precice
+} // namespace precice::config

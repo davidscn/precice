@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "precice/Version.h"
+#include "precice/export.h"
 
 /**
  * forward declarations.
@@ -36,7 +37,7 @@ namespace precice {
  *  We use solver, simulation code, and participant as synonyms.
  *  The preferred name in the documentation is participant.
  */
-class SolverInterface {
+class PRECICE_API SolverInterface {
 public:
   ///@name Construction and Configuration
   ///@{
@@ -85,52 +86,22 @@ public:
   ///@{
 
   /**
-   * @brief Fully initializes preCICE
+   * @brief Fully initializes preCICE and coupling data.
    *
    * - Sets up a connection to the other participants of the coupled simulation.
    * - Creates all meshes, solver meshes need to be submitted before.
-   * - Receives first coupling data, when the solver is not starting the
-   *   coupled simulation.
+   * - Receives first coupling data. The starting values for coupling data are zero by default.
    * - Determines length of the first timestep to be computed.
    *
-   * @pre initialize() has not yet bee called.
+   * @pre initialize() has not yet been called.
    *
-   * @post Parallel communication to the coupling partner/s is setup.
+   * @post Parallel communication to the coupling partner(s) is setup.
    * @post Meshes are exchanged between coupling partners and the parallel partitions are created.
-   * @post [Serial Coupling Scheme] If the solver is not starting the simulation, coupling data is received
-   * from the coupling partner's first computation.
+   * @post Initial coupling data was exchanged.
    *
    * @return Maximum length of first timestep to be computed by the solver.
    */
   double initialize();
-
-  /**
-   * @brief Initializes coupling data.
-   *
-   * The starting values for coupling data are zero by default.
-   *
-   * To provide custom values, first set the data using the Data Access methods and
-   * call this method to finally exchange the data.
-   *
-   * \par Serial Coupling Scheme
-   * Only the first participant has to call this method, the second participant
-   * receives the values on calling initialize().
-   *
-   * \par Parallel Coupling Scheme
-   * Values in both directions are exchanged.
-   * Both participants need to call initializeData().
-   *
-   * @pre initialize() has been called successfully.
-   * @pre The action WriteInitialData is required
-   * @pre advance() has not yet been called.
-   * @pre finalize() has not yet been called.
-   *
-   * @post Initial coupling data was exchanged.
-   *
-   * @see isActionRequired
-   * @see precice::constants::actionWriteInitialData
-   */
-  void initializeData();
 
   /**
    * @brief Advances preCICE after the solver has computed one timestep.
@@ -145,7 +116,6 @@ public:
    * @param[in] computedTimestepLength Length of timestep used by the solver.
    *
    * @pre initialize() has been called successfully.
-   * @pre initializeData() has been called, if required by configuration.
    * @pre The solver has computed one timestep.
    * @pre The solver has written all coupling data.
    * @pre isCouplngOngoing() returns true.
@@ -222,135 +192,94 @@ public:
   bool isCouplingOngoing() const;
 
   /**
-   * @brief Checks if new data to be read is available.
-   *
-   * @deprecated Removed to simplify extension to waveform relaxation.
-   *
-   * @returns whether new data is available to be read.
-   *
-   * Data is classified to be new, if it has been received while calling
-   * initialize() and before calling advance(), or in the last call of advance().
-   * This is always true, if a participant does not make use of subcycling, i.e.
-   * choosing smaller timesteps than the limits returned in initialize() and
-   * advance().
-   *
-   * @pre initialize() has been called successfully.
-   *
-   * @note
-   * It is allowed to read data even if this function returns false.
-   * This is not recommended due to performance reasons.
-   * Use this function to prevent unnecessary reads.
-   */
-  [[deprecated("Will be removed in 3.0.0. See https://github.com/precice/precice/issues/1223 and comment, if you need this function.")]] bool isReadDataAvailable() const;
-
-  /**
-   * @brief Checks if new data has to be written before calling advance().
-   *
-   * @deprecated Removed to simplify extension to waveform relaxation.
-   *
-   * @param[in] computedTimestepLength Length of timestep used by the solver.
-   *
-   * @return whether new data has to be written.
-   *
-   * This is always true, if a participant does not make use of subcycling, i.e.
-   * choosing smaller timesteps than the limits returned in initialize() and
-   * advance().
-   *
-   * @pre initialize() has been called successfully.
-   *
-   * @note
-   * It is allowed to write data even if this function returns false.
-   * This is not recommended due to performance reasons.
-   * Use this function to prevent unnecessary writes.
-   */
-  [[deprecated("Will be removed in 3.0.0. See https://github.com/precice/precice/issues/1223 and comment, if you need this function.")]] bool isWriteDataRequired(double computedTimestepLength) const;
-
-  /**
    * @brief Checks if the current coupling window is completed.
    *
-   * @returns whether the current coupling window is complete.
+   * @returns whether the current time window is complete.
    *
-   * The following reasons require several solver time steps per time window
-   * step:
+   * The following reasons require several solver time steps per time window:
    * - A solver chooses to perform subcycling, i.e. using a smaller timestep
-   *   than the time window..
+   *   than the time window.
    * - An implicit coupling iteration is not yet converged.
+   *
+   * Hence, a time window is complete if we reach the end of the time window
+   * and the implicit coupling has converged.
+   *
+   * For implicit coupling this condition is equivalent with the requirement to
+   * write an iteration checkpoint. This is, however, not the case for explicit
+   * coupling.
    *
    * @pre initialize() has been called successfully.
    */
   bool isTimeWindowComplete() const;
 
-  // Will be removed in v3.0.0. See https://github.com/precice/precice/issues/704
-  /**
-   * @brief Returns whether the solver has to evaluate the surrogate model representation.
-   *
-   * @deprecated
-   * Was necessary for deleted manifold mapping. Always returns false.
-   *
-   * @returns whether the surrogate model has to be evaluated.
-   *
-   * @note
-   * The solver may still have to evaluate the fine model representation.
-   *
-   * @see hasToEvaluateFineModel()
-   */
-  [[deprecated("The manifold mapping feature is no longer supported.")]] bool hasToEvaluateSurrogateModel() const;
+  ///@}
 
-  // Will be removed in v3.0.0. See https://github.com/precice/precice/issues/704
-  /**
-   * @brief Checks if the solver has to evaluate the fine model representation.
+  ///@name Requirements
+  ///@{
+
+  /** Checks if the participant is required to provide initial data.
    *
-   * @deprecated
-   * Was necessary for deprecated manifold mapping. Always returns true.
+   * If true, then the participant needs to write initial data to defined vertices
+   * prior to calling initialize().
    *
-   * @returns whether the fine model has to be evaluated.
-   *
-   * @note
-   * The solver may still have to evaluate the surrogate model representation.
-   *
-   * @see hasToEvaluateSurrogateModel()
+   * @pre initialize() has not yet been called
    */
-  [[deprecated("The manifold mapping feature is no longer supported.")]] bool hasToEvaluateFineModel() const;
+  bool requiresInitialData();
+
+  /** Checks if the participant is required to write an iteration checkpoint.
+   *
+   * If true, the participant is required to write an iteration checkpoint before
+   * calling advance().
+   *
+   * preCICE refuses to proceed if writing a checkpoint is required,
+   * but this method isn't called prior to advance().
+   *
+   * @pre initialize() has been called
+   *
+   * @see requiresReadingCheckpoint()
+   */
+  bool requiresWritingCheckpoint();
+
+  /** Checks if the participant is required to read an iteration checkpoint.
+   *
+   * If true, the participant is required to read an iteration checkpoint before
+   * calling advance().
+   *
+   * preCICE refuses to proceed if reading a checkpoint is required,
+   * but this method isn't called prior to advance().
+   *
+   * @note This function returns false before the first call to advance().
+   *
+   * @pre initialize() has been called
+   *
+   * @see requiresWritingCheckpoint()
+   */
+  bool requiresReadingCheckpoint();
 
   ///@}
 
-  ///@name Action Methods
-  ///@{
-
-  /**
-   * @brief Checks if the provided action is required.
+  /** @name Mesh Access
+   * @anchor precice-mesh-access
    *
-   * @param[in] action the name of the action
-   * @returns whether the action is required
+   * Connectivity is optional.
+   * Use requiresMeshConnectivityFor() to check if the current participant can make use of the connectivity.
    *
-   * Some features of preCICE require a solver to perform specific actions, in
-   * order to be in valid state for a coupled simulation. A solver is made
-   * eligible to use those features, by querying for the required actions,
-   * performing them on demand, and calling markActionFulfilled() to signalize
-   * preCICE the correct behavior of the solver.
+   * Only set the mesh connectivity that you require for your use-case and use the face/cell elements that your solver provides.
+   * preCICE removes all connectivity duplicates in initialize().
    *
-   * @see markActionFulfilled()
-   * @see cplscheme::constants
+   * We recommend you to do the following depending on your case:
+   *
+   * - **2D surface coupling:** Use setMeshEdge() and setMeshEdges() to specify the coupling interface.
+   * - **2D volume coupling:** Use setMeshTriangle() and setMeshTriangles() to specify the coupling area.
+   * - **3D surface coupling:** Use setMeshTriangle() and setMeshTriangles() to specify the coupling interface.
+   * - **3D volume coupling:** Use setMeshTetrahedron() and setMeshTetrahedra() to specify the coupling volume.
+   *
+   * As an alternative to triangles, preCICE supports **planar** quads using setMeshQuad() and setMeshQuads().
+   * These quads will be triangulated by preCICE, hence specifying triangles is generally preferred.
+   * Before using quads, we recommended to check if your solver provides a way to traverse triangulated faces.
+   *
+   *@{
    */
-  bool isActionRequired(const std::string &action) const;
-
-  /**
-   * @brief Indicates preCICE that a required action has been fulfilled by a solver.
-   *
-   * @pre The solver fulfilled the specified action.
-   *
-   * @param[in] action the name of the action
-   *
-   * @see requireAction()
-   * @see cplscheme::constants
-   */
-  void markActionFulfilled(const std::string &action);
-
-  ///@}
-
-  ///@name Mesh Access
-  ///@anchor precice-mesh-access
-  ///@{
 
   /*
    * @brief Resets mesh with given ID.
@@ -382,16 +311,6 @@ public:
   int getMeshID(const std::string &meshName) const;
 
   /**
-   * @brief Returns a id-set of all used meshes by this participant.
-   *
-   * @deprecated Unclear use case and difficult to port to other languages.
-   *             Prefer calling getMeshID for specific mesh names.
-   *
-   * @returns the set of ids.
-   */
-  [[deprecated("Use getMeshID() for specific mesh names instead.")]] std::set<int> getMeshIDs() const;
-
-  /**
    * @brief Checks if the given mesh requires connectivity.
    *
    * preCICE may require connectivity information from the solver and
@@ -401,7 +320,7 @@ public:
    * @param[in] meshID the id of the mesh
    * @returns whether connectivity is required
    */
-  bool isMeshConnectivityRequired(int meshID) const;
+  bool requiresMeshConnectivityFor(int meshID) const;
 
   /**
    * @brief Creates a mesh vertex
@@ -456,87 +375,51 @@ public:
       int *         ids);
 
   /**
-   * @brief Get vertex positions for multiple vertex ids from a given mesh
+   * @brief Sets a mesh edge from vertex IDs
    *
-   * @param[in] meshID the id of the mesh to read the vertices from.
-   * @param[in] size Number of vertices to lookup
-   * @param[in] ids The ids of the vertices to lookup
-   * @param[out] positions a pointer to memory to write the coordinates to
-   *            The 2D-format is (d0x, d0y, d1x, d1y, ..., dnx, dny)
-   *            The 3D-format is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz)
+   * Ignored if preCICE doesn't require connectivity for the mesh.
    *
-   * @pre count of available elements at positions matches the configured dimension * size
-   * @pre count of available elements at ids matches size
-   *
-   * @see getDimensions()
-   */
-  void getMeshVertices(
-      int        meshID,
-      int        size,
-      const int *ids,
-      double *   positions) const;
-
-  /**
-   * @brief Gets mesh vertex IDs from positions.
-   *
-   * @param[in] meshID ID of the mesh to retrieve positions from
-   * @param[in] size Number of vertices to lookup.
-   * @param[in] positions Positions to find ids for.
-   *            The 2D-format is (d0x, d0y, d1x, d1y, ..., dnx, dny)
-   *            The 3D-format is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz)
-   * @param[out] ids IDs corresponding to positions.
-   *
-   * @pre count of available elements at positions matches the configured dimension * size
-   * @pre count of available elements at ids matches size
-   *
-   * @note prefer to reuse the IDs returned from calls to setMeshVertex() and setMeshVertices().
-   */
-  void getMeshVertexIDsFromPositions(
-      int           meshID,
-      int           size,
-      const double *positions,
-      int *         ids) const;
-
-  /**
-   * @brief Sets mesh edge from vertex IDs, returns edge ID.
+   * @note The order of vertices does not matter.
    *
    * @param[in] meshID ID of the mesh to add the edge to
    * @param[in] firstVertexID ID of the first vertex of the edge
    * @param[in] secondVertexID ID of the second vertex of the edge
    *
-   * @return the ID of the edge
-   *
    * @pre vertices with firstVertexID and secondVertexID were added to the mesh with the ID meshID
    */
-  int setMeshEdge(
+  void setMeshEdge(
       int meshID,
       int firstVertexID,
       int secondVertexID);
 
   /**
-   * @brief Sets mesh triangle from edge IDs
+   * @brief Sets multiple mesh edge from vertex IDs
    *
-   * @param[in] meshID ID of the mesh to add the triangle to
-   * @param[in] firstEdgeID ID of the first edge of the triangle
-   * @param[in] secondEdgeID ID of the second edge of the triangle
-   * @param[in] thirdEdgeID ID of the third edge of the triangle
+   * vertices contain pairs of vertex indices for each edge to define.
+   * The format follows: e1a, e1b, e2a, e2b, ...
+   * Ignored if preCICE doesn't require connectivity for the mesh.
    *
-   * @pre edges with firstEdgeID, secondEdgeID, and thirdEdgeID were added to the mesh with the ID meshID
+   * @note The order of vertices per edge does not matter.
+   *
+   * @param[in] meshID ID of the mesh to add the edges to
+   * @param[in] size the amount of edges to set
+   * @param[in] vertices an array containing 2*size vertex IDs
+   *
+   * @pre vertices were added to the mesh with the ID meshID
+   *
+   * @see requiresMeshConnectivityFor()
    */
-  void setMeshTriangle(
-      int meshID,
-      int firstEdgeID,
-      int secondEdgeID,
-      int thirdEdgeID);
+  void setMeshEdges(
+      int        meshID,
+      int        size,
+      const int *vertices);
 
   /**
    * @brief Sets mesh triangle from vertex IDs.
    *
-   * @warning
-   * This routine is supposed to be used, when no edge information is available
-   * per se. Edges are created on the fly within preCICE. This routine is
-   * significantly slower than the one using edge IDs, since it needs to check,
-   * whether an edge is created already or not.
+   *
+   *
+   * @note The order of vertices does not matter.
    *
    * @param[in] meshID ID of the mesh to add the triangle to
    * @param[in] firstVertexID ID of the first vertex of the triangle
@@ -544,40 +427,44 @@ public:
    * @param[in] thirdVertexID ID of the third vertex of the triangle
    *
    * @pre edges with firstVertexID, secondVertexID, and thirdVertexID were added to the mesh with the ID meshID
+   *
+   * @see requiresMeshConnectivityFor()
    */
-  void setMeshTriangleWithEdges(
+  void setMeshTriangle(
       int meshID,
       int firstVertexID,
       int secondVertexID,
       int thirdVertexID);
 
   /**
-   * @brief Sets mesh Quad from edge IDs.
+   * @brief Sets multiple mesh triangles from vertex IDs
    *
-   * @param[in] meshID ID of the mesh to add the Quad to
-   * @param[in] firstEdgeID ID of the first edge of the Quad
-   * @param[in] secondEdgeID ID of the second edge of the Quad
-   * @param[in] thirdEdgeID ID of the third edge of the Quad
-   * @param[in] fourthEdgeID ID of the forth edge of the Quad
+   * vertices contain triples of vertex indices for each triangle to define.
+   * The format follows: t1a, t1b, t1c, t2a, t2b, t2c, ...
+   * Ignored if preCICE doesn't require connectivity for the mesh.
    *
-   * @pre edges with firstEdgeID, secondEdgeID, thirdEdgeID and fourthEdgeID were added to the mesh with the ID meshID.
+   * @note The order of vertices per triangle does not matter.
    *
+   * @param[in] meshID ID of the mesh to add the triangles to
+   * @param[in] size the amount of triangles to set
+   * @param[in] vertices an array containing 3*size vertex IDs
+   *
+   * @pre vertices were added to the mesh with the ID meshID
+   *
+   * @see requiresMeshConnectivityFor()
    */
-  void setMeshQuad(
-      int meshID,
-      int firstEdgeID,
-      int secondEdgeID,
-      int thirdEdgeID,
-      int fourthEdgeID);
+  void setMeshTriangles(
+      int        meshID,
+      int        size,
+      const int *vertices);
 
   /**
-   * @brief Sets surface mesh quadrangle from vertex IDs.
+   * @brief Sets a planar surface mesh quadrangle from vertex IDs.
    *
-   * @warning
-   * This routine is supposed to be used, when no edge information is available
-   * per se. Edges are created on the fly within preCICE. This routine is
-   * significantly slower than the one using edge IDs, since it needs to check,
-   * whether an edge is created already or not.
+   * The planar quad will be triangulated, maximizing area-to-circumference.
+   * Ignored if preCICE doesn't require connectivity for the mesh.
+   *
+   * @warning The order of vertices does not matter, however, only planar quads are allowed.
    *
    * @param[in] meshID ID of the mesh to add the Quad to
    * @param[in] firstVertexID ID of the first vertex of the Quad
@@ -587,8 +474,9 @@ public:
    *
    * @pre vertices with firstVertexID, secondVertexID, thirdVertexID, and fourthVertexID were added to the mesh with the ID meshID
    *
+   * @see requiresMeshConnectivityFor()
    */
-  void setMeshQuadWithEdges(
+  void setMeshQuad(
       int meshID,
       int firstVertexID,
       int secondVertexID,
@@ -596,8 +484,34 @@ public:
       int fourthVertexID);
 
   /**
+   * @brief Sets multiple mesh quads from vertex IDs
+   *
+   * vertices contain quadruples of vertex indices for each quad to define.
+   * The format follows: q1a, q1b, q1c, q1d, q2a, q2b, q2c, q2d, ...
+   *
+   * Each planar quad will be triangulated, maximizing area-to-circumference.
+   * Ignored if preCICE doesn't require connectivity for the mesh.
+   *
+   * @warning The order of vertices per quad does not matter, however, only planar quads are allowed.
+   *
+   * @param[in] meshID ID of the mesh to add the quad to
+   * @param[in] size the amount of quads to set
+   * @param[in] vertices an array containing 4*size vertex IDs
+   *
+   * @pre vertices were added to the mesh with the ID meshID
+   *
+   * @see requiresMeshConnectivityFor()
+   */
+  void setMeshQuads(
+      int        meshID,
+      int        size,
+      const int *vertices);
+
+  /**
    * @brief Set tetrahedron in 3D mesh from vertex ID
-   * 
+   *
+   * @note The order of vertices does not matter.
+   *
    * @param[in] meshID ID of the mesh to add the Tetrahedron to
    * @param[in] firstVertexID ID of the first vertex of the Tetrahedron
    * @param[in] secondVertexID ID of the second vertex of the Tetrahedron
@@ -605,6 +519,8 @@ public:
    * @param[in] fourthVertexID ID of the fourth vertex of the Tetrahedron
    *
    * @pre vertices with firstVertexID, secondVertexID, thirdVertexID, and fourthVertexID were added to the mesh with the ID meshID
+   *
+   * @see requiresMeshConnectivityFor()
    */
   void setMeshTetrahedron(
       int meshID,
@@ -612,6 +528,28 @@ public:
       int secondVertexID,
       int thirdVertexID,
       int fourthVertexID);
+
+  /**
+   * @brief Sets multiple mesh tetrahedra from vertex IDs
+   *
+   * vertices contain quadruples of vertex indices for each tetrahedron to define.
+   * The format follows: t1a, t1b, t1c, t1d, t2a, t2b, t2c, t2d, ...
+   * Ignored if preCICE doesn't require connectivity for the mesh.
+   *
+   * @note The order of vertices per tetrahedron does not matter.
+   *
+   * @param[in] meshID ID of the mesh to add the tetrahedra to
+   * @param[in] size the amount of tetrahedra to set
+   * @param[in] vertices an array containing 4*size vertex IDs
+   *
+   * @pre vertices were added to the mesh with the ID meshID
+   *
+   * @see requiresMeshConnectivityFor()
+   */
+  void setMeshTetrahedra(
+      int        meshID,
+      int        size,
+      const int *vertices);
 
   ///@}
 
@@ -636,30 +574,6 @@ public:
    * @returns the id of the corresponding data
    */
   int getDataID(const std::string &dataName, int meshID) const;
-
-  /**
-   * @brief Computes and maps all read data mapped to the mesh with given ID.
-   *
-   * @deprecated Unclear use case and difficult to maintain.
-   *
-   * This is an explicit request to map read data to the Mesh associated with toMeshID.
-   * It also computes the mapping if necessary.
-   *
-   * @pre A mapping to toMeshID was configured.
-   */
-  [[deprecated("Will be removed in 3.0.0. See https://github.com/precice/precice/issues/859 and comment, if you need this function.")]] void mapReadDataTo(int toMeshID);
-
-  /**
-   * @brief Computes and maps all write data mapped from the mesh with given ID.
-   *
-   * @deprecated Unclear use case and difficult to maintain.
-   *
-   * This is an explicit request to map write data from the Mesh associated with fromMeshID.
-   * It also computes the mapping if necessary.
-   *
-   * @pre A mapping from fromMeshID was configured.
-   */
-  [[deprecated("Will be removed in 3.0.0. See https://github.com/precice/precice/issues/859 and comment, if you need this function.")]] void mapWriteDataFrom(int fromMeshID);
 
   /**
    * @brief Writes vector data given as block.
@@ -862,7 +776,7 @@ public:
 
   /**
    * @brief setMeshAccessRegion Define a region of interest on a received mesh
-   *        (<use-mesh ... from="otherParticipant />") in order to receive
+   *        (<receive-mesh ... from="otherParticipant />") in order to receive
    *        only a certain mesh region. Have a look at the website under
    *        https://precice.org/couple-your-code-direct-access.html or
    *        navigate manually to the page  Docs->Couple your code
@@ -1109,7 +1023,7 @@ public:
    * @param[in] dataID the id of the data
    * @returns whether gradient is required
    */
-  bool isGradientDataRequired(int dataID) const;
+  bool requiresGradientDataFor(int dataID) const;
 
   /**
    * @brief Writes vector gradient data given as block.
@@ -1261,29 +1175,5 @@ private:
   // @brief To allow white box tests.
   friend struct testing::WhiteboxAccessor;
 };
-
-/**
- * @brief Returns information on the version of preCICE.
- *
- * Returns a semicolon-separated C-string containing:
- *
- * 1) the version of preCICE
- * 2) the revision information of preCICE
- * 3) the configuration of preCICE including MPI, PETSC, PYTHON
- */
-std::string getVersionInformation();
-
-namespace constants {
-
-// @brief Name of action for writing initial data.
-const std::string &actionWriteInitialData();
-
-// @brief Name of action for writing iteration checkpoint
-const std::string &actionWriteIterationCheckpoint();
-
-// @brief Name of action for reading iteration checkpoint.
-const std::string &actionReadIterationCheckpoint();
-
-} // namespace constants
 
 } // namespace precice

@@ -12,19 +12,18 @@
     </mesh>
 
     <participant name="SolverOne">
-      <use-mesh name="MeshOne" provide="on" />
+      <provide-mesh name="MeshOne" />
       <read-data name="Data" mesh="MeshOne" />
     </participant>
 
     <participant name="SolverTwo">
-      <use-mesh name="MeshOne" from="SolverOne" />
-      <use-mesh name="MeshTwo" provide="on" />
+      <receive-mesh name="MeshOne" from="SolverOne" />
+      <provide-mesh name="MeshTwo" />
       <mapping:nearest-neighbor
         direction="write"
         from="MeshTwo"
         to="MeshOne"
-        constraint="conservative"
-        timing="initial" />
+        constraint="conservative" />
       <write-data name="Data" mesh="MeshTwo" />
     </participant>
 

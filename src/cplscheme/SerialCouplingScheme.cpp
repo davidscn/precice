@@ -15,8 +15,7 @@
 #include "math/differences.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace cplscheme {
+namespace precice::cplscheme {
 
 SerialCouplingScheme::SerialCouplingScheme(
     double                        maxTime,
@@ -76,77 +75,60 @@ void SerialCouplingScheme::receiveAndSetTimeWindowSize()
   }
 }
 
-void SerialCouplingScheme::initializeImplementation()
+void SerialCouplingScheme::performReceiveOfFirstAdvance()
 {
-  // determine whether initial data needs to be communicated
-  determineInitialSend(getSendData());
-  determineInitialReceive(getReceiveData());
-
-  // If the second participant initializes data, the first receive for the
-  // second participant is done in initializeData() instead of initialize().
-  if (not doesFirstStep() && not sendsInitializedData() && isCouplingOngoing()) {
+  if (doesFirstStep()) {
+    // do nothing
+  } else { // second participant
     receiveAndSetTimeWindowSize();
-    PRECICE_DEBUG("Receiving data");
+    PRECICE_DEBUG("Receiving data...");
     receiveData(getM2N(), getReceiveData());
     checkDataHasBeenReceived();
   }
 }
 
-void SerialCouplingScheme::exchangeInitialData()
+void SerialCouplingScheme::exchangeFirstData()
 {
-  if (doesFirstStep()) {
-    PRECICE_ASSERT(not sendsInitializedData(), "First participant cannot send data during initialization.");
-    if (receivesInitializedData()) {
-      receiveData(getM2N(), getReceiveData());
-      checkInitialDataHasBeenReceived();
-    }
-  } else { // second participant
-    PRECICE_ASSERT(not receivesInitializedData(), "Only first participant can receive data during initialization.");
-    if (sendsInitializedData()) {
-      // The second participant sends the initialized data to the first participant
-      // here, which receives the data on call of initialize().
-      sendData(getM2N(), getSendData());
-      receiveAndSetTimeWindowSize();
-      // This receive replaces the receive in initialize().
-      receiveData(getM2N(), getReceiveData());
-      checkDataHasBeenReceived();
-    }
-  }
-}
-
-bool SerialCouplingScheme::exchangeDataAndAccelerate()
-{
-  bool convergence = true;
-
   if (doesFirstStep()) { // first participant
     PRECICE_DEBUG("Sending data...");
     sendTimeWindowSize();
     sendData(getM2N(), getSendData());
+  } else { // second participant
     if (isImplicitCouplingScheme()) {
-      convergence = receiveConvergence(getM2N());
+      PRECICE_DEBUG("Test Convergence and accelerate...");
+      doImplicitStep();
+      sendConvergence(getM2N());
+    }
+    PRECICE_DEBUG("Sending data...");
+    sendData(getM2N(), getSendData());
+  }
+}
+
+void SerialCouplingScheme::exchangeSecondData()
+{
+  if (doesFirstStep()) { // first participant
+    PRECICE_DEBUG("Receiving convergence data...");
+    if (isImplicitCouplingScheme()) {
+      receiveConvergence(getM2N());
     }
     PRECICE_DEBUG("Receiving data...");
     receiveData(getM2N(), getReceiveData());
     checkDataHasBeenReceived();
   } else { // second participant
-    if (isImplicitCouplingScheme()) {
-      PRECICE_DEBUG("Test Convergence and accelerate...");
-      convergence = doImplicitStep();
-      sendConvergence(getM2N(), convergence);
-    }
-    PRECICE_DEBUG("Sending data...");
-    sendData(getM2N(), getSendData());
     // the second participant does not want new data in the last iteration of the last time window
-    if (isCouplingOngoing() || (isImplicitCouplingScheme() && not convergence)) {
+    if (isCouplingOngoing() || (isImplicitCouplingScheme() && not hasConverged())) {
       receiveAndSetTimeWindowSize();
       PRECICE_DEBUG("Receiving data...");
       receiveData(getM2N(), getReceiveData());
       checkDataHasBeenReceived();
     }
   }
-
-  return convergence;
 }
 
-} // namespace cplscheme
-} // namespace precice
+const DataMap SerialCouplingScheme::getAccelerationData()
+{
+  // SerialCouplingSchemes applies acceleration to send data
+  return getSendData();
+}
+
+} // namespace precice::cplscheme

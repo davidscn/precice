@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.16.3)
-project(preCICE VERSION 2.4.0 LANGUAGES CXX)
+project(preCICE VERSION 2.5.0 LANGUAGES CXX)
 set(preCICE_SOVERSION ${preCICE_VERSION_MAJOR})
 
 #
@@ -57,13 +57,13 @@ option(PRECICE_MPICommunication "Enables MPI-based communication and running cou
 option(PRECICE_PETScMapping "Enable use of the PETSc linear algebra library." ON)
 option(PRECICE_PythonActions "Python support" ON)
 option(PRECICE_Packages "Configure package generation." ON)
-option(PRECICE_InstallTest "Add test binary and necessary files to install target." OFF)
 option(BUILD_SHARED_LIBS "Build shared instead of static libraries" ON)
 option(BUILD_TESTING "Build tests" ON)
 option(PRECICE_ALWAYS_VALIDATE_LIBS "Validate libraries even after the validatation succeeded." OFF)
 option(PRECICE_ENABLE_C "Enable the native C bindings" ON)
 option(PRECICE_ENABLE_FORTRAN "Enable the native Fortran bindings" ON)
 option(PRECICE_BUILD_TOOLS "Build the \"precice-tools\" executable" ON)
+option(PRECICE_ENABLE_LIBBACKTRACE "Enable libbacktrace for stacktrace generation." OFF)
 
 option(PRECICE_RELEASE_WITH_DEBUG_LOG "Enable debug logging in release builds" OFF)
 option(PRECICE_RELEASE_WITH_TRACE_LOG "Enable trace logging in release builds" OFF)
@@ -86,7 +86,6 @@ include(PrintHelper)
 print_configuration(
   ADDITIONAL
   "PRECICE_Packages;Configure package generation"
-  "PRECICE_InstallTest;Install tests/testfiles"
   "PRECICE_CTEST_MPI_FLAGS;Additional CTest MPI Flags"
   )
 print_empty()
@@ -135,13 +134,21 @@ add_feature_info(FortranBindings PRECICE_ENABLE_FORTRAN
 
    This feature can be enabled/disabled by setting the PRECICE_ENABLE_FORTRAN CMake option.
   ")
-  add_feature_info(PreciceTools PRECICE_BUILD_TOOLS
+add_feature_info(PreciceTools PRECICE_BUILD_TOOLS
   "Build the \"precice-tools\" executable
 
    preCICE offers in addition to the core library a variety of tools in order to check configuration
-   files or generate xml references. The tools are copmiled into an exectuable called \"precice-tools\".
+   files or generate xml references. The tools are copmiled into an executable called \"precice-tools\".
 
    This feature can be enabled/disabled by setting the PRECICE_BUILD_TOOLS CMake option.
+  ")
+  add_feature_info(libbacktrace PRECICE_ENABLE_LIBBACKTRACE
+  "Enables libbacktrace for stracktrace generation.
+
+   preCICE assertions are helpful during development, however, the default stacktraces may not be sufficient.
+   This feature enables the support for libbacktrace in boost.stacktrace.
+
+   This feature can be enabled/disabled by setting the PRECICE_ENABLE_LIBBACKTRACE CMake option.
   ")
 
 
@@ -166,6 +173,9 @@ endif()
 find_package(Boost 1.71.0 REQUIRED
   COMPONENTS filesystem log log_setup program_options system thread unit_test_framework
   )
+mark_as_advanced(Boost_FILESYSTEM_LIBRARY_RELEASE Boost_INCLUDE_DIR Boost_LOG_LIBRARY_RELEASE Boost_LOG_SETUP_LIBRARY_RELEASE Boost_PROGRAM_OPTIONS_LIBRARY_RELEASE Boost_SYSTEM_LIBRARY_RELEASE Boost_THREAD_LIBRARY_RELEASE Boost_UNIT_TEST_FRAMEWORK_LIBRARY_RELEASE)
+mark_as_advanced(Boost_FILESYSTEM_LIBRARY_DEBUG Boost_INCLUDE_DIR Boost_LOG_LIBRARY_DEBUG Boost_LOG_SETUP_LIBRARY_DEBUG Boost_PROGRAM_OPTIONS_LIBRARY_DEBUG Boost_SYSTEM_LIBRARY_DEBUG Boost_THREAD_LIBRARY_DEBUG Boost_UNIT_TEST_FRAMEWORK_LIBRARY_DEBUG)
+message(STATUS "Found Boost ${Boost_VERSION}")
 
 # Eigen
 if(TPL_ENABLE_EIGEN3)
@@ -173,10 +183,12 @@ if(TPL_ENABLE_EIGEN3)
   xsdk_tpl_require(EIGEN3 EIGEN3_INCLUDE_DIR)
 endif()
 find_package(Eigen3 3.2 REQUIRED)
+message(STATUS "Found Eigen ${EIGEN3_VERSION}")
 precice_validate_eigen()
 
 # LibXML2
 find_package(LibXml2 REQUIRED)
+message(STATUS "Found LibXml2 ${LIBXML2_VERSION_STRING}")
 precice_validate_libxml2()
 
 # nlohmann/JSON
@@ -219,6 +231,7 @@ if (PRECICE_PETScMapping)
   endif()
   find_package(PETSc 3.12 REQUIRED)
   # No validation required as PETSc does this internally
+  message(STATUS "Found PETSc ${PETSc_VERSION}")
 else()
   message(STATUS "PETSc support disabled")
 endif()
@@ -226,12 +239,18 @@ endif()
 # Option Python
 if (PRECICE_PythonActions)
   find_package(Python3 REQUIRED COMPONENTS Development NumPy)
+  message(STATUS "Found Python ${Python3_VERSION} with NumPy ${Python3_NumPy_VERSION}")
   precice_validate_libpython()
   precice_validate_numpy()
 else()
   message(STATUS "Python support disabled")
 endif()
 
+# Option ENABLE_LIBBACKTRACE
+# Note that the FindBacktrace module does not work reliably to find libbacktrace installations
+if (PRECICE_ENABLE_LIBBACKTRACE)
+  add_subdirectory(thirdparty/libbacktrace)
+endif()
 
 #
 # Setup miscellaneous features
@@ -248,34 +267,35 @@ add_compile_definitions("$<$<CONFIG:DEBUG>:_GLIBCXX_ASSERTIONS>")
 print_empty()
 print_section("TARGETS & PACKAGES")
 
-# Add precice as an empty target
-add_library(precice)
-set_target_properties(precice PROPERTIES
-  # precice is a C++14 project
-  CXX_STANDARD 14
+# Core of preCICE bundling the sources and dependencies.
+# The main library and tests link against this.
+add_library(preciceCore OBJECT)
+set_target_properties(preciceCore PROPERTIES
+  CXX_STANDARD 17
   CXX_STANDARD_REQUIRED Yes
   CXX_EXTENSIONS No
-  VERSION ${preCICE_VERSION}
-  SOVERSION ${preCICE_SOVERSION}
+  POSITION_INDEPENDENT_CODE YES
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN YES
   )
 
 # Setup release override options
 if(PRECICE_RELEASE_WITH_DEBUG_LOG)
-  target_compile_definitions(precice PRIVATE PRECICE_RELEASE_WITH_DEBUG_LOG)
+  target_compile_definitions(preciceCore PUBLIC PRECICE_RELEASE_WITH_DEBUG_LOG)
 endif()
 
 if(PRECICE_RELEASE_WITH_TRACE_LOG)
-  target_compile_definitions(precice PRIVATE PRECICE_RELEASE_WITH_TRACE_LOG)
+  target_compile_definitions(preciceCore PUBLIC PRECICE_RELEASE_WITH_TRACE_LOG)
 endif()
 
 if(PRECICE_RELEASE_WITH_ASSERTIONS)
-  target_compile_definitions(precice PRIVATE PRECICE_RELEASE_WITH_ASSERTIONS)
+  target_compile_definitions(preciceCore PUBLIC PRECICE_RELEASE_WITH_ASSERTIONS)
 endif()
 
 
 # Setup Boost
-target_compile_definitions(precice PRIVATE BOOST_ALL_DYN_LINK BOOST_ASIO_ENABLE_OLD_SERVICES BOOST_GEOMETRY_DISABLE_DEPRECATED_03_WARNING)
-target_link_libraries(precice PRIVATE
+target_compile_definitions(preciceCore PUBLIC BOOST_ALL_DYN_LINK BOOST_ASIO_ENABLE_OLD_SERVICES BOOST_GEOMETRY_DISABLE_DEPRECATED_03_WARNING)
+target_link_libraries(preciceCore PUBLIC
   Boost::boost
   Boost::filesystem
   Boost::log
@@ -286,42 +306,72 @@ target_link_libraries(precice PRIVATE
   Boost::unit_test_framework
   )
 if(UNIX OR APPLE OR MINGW)
-  target_compile_definitions(precice PRIVATE _GNU_SOURCE)
-  target_link_libraries(precice PRIVATE ${CMAKE_DL_LIBS})
+  target_compile_definitions(preciceCore PUBLIC _GNU_SOURCE)
+  target_link_libraries(preciceCore PUBLIC ${CMAKE_DL_LIBS})
+endif()
+if(PRECICE_ENABLE_LIBBACKTRACE)
+  target_compile_definitions(preciceCore PRIVATE BOOST_STACKTRACE_USE_BACKTRACE)
+  target_link_libraries(preciceCore PRIVATE internal::libbacktrace)
 endif()
 
 # Setup Eigen3
-target_link_libraries(precice PRIVATE Eigen3::Eigen)
-target_compile_definitions(precice PRIVATE "$<$<CONFIG:DEBUG>:EIGEN_INITIALIZE_MATRICES_BY_NAN>")
+target_link_libraries(preciceCore PUBLIC Eigen3::Eigen)
+target_compile_definitions(preciceCore PUBLIC "$<$<CONFIG:DEBUG>:EIGEN_INITIALIZE_MATRICES_BY_NAN>")
 
 # Setup LIBXML2
-target_link_libraries(precice PRIVATE LibXml2::LibXml2)
+target_link_libraries(preciceCore PUBLIC LibXml2::LibXml2)
 
 # Setup JSON
-target_link_libraries(precice PRIVATE JSON fmt-header-only)
+target_link_libraries(preciceCore PUBLIC JSON fmt-header-only)
 
 # Setup MPI
 if (PRECICE_MPICommunication)
-  target_link_libraries(precice PRIVATE MPI::MPI_CXX)
+  target_link_libraries(preciceCore PUBLIC MPI::MPI_CXX)
 else()
-  target_compile_definitions(precice PRIVATE PRECICE_NO_MPI)
+  target_compile_definitions(preciceCore PUBLIC PRECICE_NO_MPI)
 endif()
 
 # Setup PETSC
 if (PRECICE_PETScMapping AND PRECICE_MPICommunication)
-  target_link_libraries(precice PRIVATE PETSc::PETSc)
+  target_link_libraries(preciceCore PUBLIC PETSc::PETSc)
 else()
-  target_compile_definitions(precice PRIVATE PRECICE_NO_PETSC)
+  target_compile_definitions(preciceCore PUBLIC PRECICE_NO_PETSC)
 endif()
 
 # Option Python
 if (PRECICE_PythonActions)
-  target_link_libraries(precice PRIVATE Python3::NumPy Python3::Python)
-  target_compile_definitions(precice PRIVATE NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
+  target_link_libraries(preciceCore PUBLIC Python3::NumPy Python3::Python)
+  target_compile_definitions(preciceCore PUBLIC NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
 else()
-  target_compile_definitions(precice PRIVATE PRECICE_NO_PYTHON)
+  target_compile_definitions(preciceCore PUBLIC PRECICE_NO_PYTHON)
 endif()
 
+# Includes configuration for the core
+target_include_directories(preciceCore PUBLIC
+  $<BUILD_INTERFACE:${preCICE_SOURCE_DIR}/src>
+  $<BUILD_INTERFACE:${preCICE_BINARY_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+  )
+
+# Add precice as an empty target
+add_library(precice)
+set_target_properties(precice PROPERTIES
+  VERSION ${preCICE_VERSION}
+  SOVERSION ${preCICE_SOVERSION}
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN YES
+  )
+
+target_include_directories(precice PUBLIC
+  $<BUILD_INTERFACE:${preCICE_SOURCE_DIR}/src>
+  $<BUILD_INTERFACE:${preCICE_BINARY_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+  )
+
+target_link_libraries(precice PRIVATE preciceCore)
+
+# Sources Configuration
+include(${CMAKE_CURRENT_LIST_DIR}/src/sources.cmake)
 
 # File Configuration
 include(GenerateVersionInformation)
@@ -329,16 +379,18 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/DetectGitRevision.cmake)
 configure_file("${PROJECT_SOURCE_DIR}/src/precice/impl/versions.hpp.in" "${PROJECT_BINARY_DIR}/src/precice/impl/versions.hpp" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/precice/Version.h.in" "${PROJECT_BINARY_DIR}/src/precice/Version.h" @ONLY)
 
-# Includes Configuration
-target_include_directories(precice PUBLIC
-  $<BUILD_INTERFACE:${preCICE_SOURCE_DIR}/src>
-  $<BUILD_INTERFACE:${preCICE_BINARY_DIR}/src>
-  $<INSTALL_INTERFACE:include>
+# Setup export header
+include(GenerateExportHeader)
+GENERATE_EXPORT_HEADER(preciceCore
+  EXPORT_FILE_NAME "src/precice/export.h"
+  BASE_NAME PRECICE
+  EXPORT_MACRO_NAME PRECICE_API
+  INCLUDE_GUARD_NAME PRECICE_EXPORT
   )
 
-# Sources Configuration
-include(${CMAKE_CURRENT_LIST_DIR}/src/sources.cmake)
-
+# Add the export header to the public headers of the preCICE lib
+set_property(TARGET precice APPEND PROPERTY PUBLIC_HEADER
+    ${CMAKE_BINARY_DIR}/src/precice/export.h)
 
 #
 # Configuration of Target precice-tools
@@ -350,21 +402,10 @@ if (PRECICE_BUILD_TOOLS)
    precice
    )
   set_target_properties(precice-tools PROPERTIES
-    # precice is a C++14 project
-    CXX_STANDARD 14
+    # precice is a C++17 project
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED Yes
     CXX_EXTENSIONS No
-    )
-
-  # Add link for backwards compatibility
-  # TODO remove in 3.0.0
-  add_custom_target(
-    binprecice
-    ALL
-    COMMAND ${CMAKE_COMMAND} -E create_symlink precice-tools binprecice
-    DEPENDS precice-tools
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    BYPRODUCTS binprecice
     )
 
   # Link or copy the events script to the binary directory
@@ -381,22 +422,10 @@ IF (BUILD_TESTING)
   add_executable(testprecice "src/testing/main.cpp")
   target_link_libraries(testprecice
     PRIVATE
-    Threads::Threads
-    precice
-    Eigen3::Eigen
-    fmt-header-only
-    Boost::boost
-    Boost::filesystem
-    Boost::log
-    Boost::log_setup
-    Boost::program_options
-    Boost::system
-    Boost::thread
-    Boost::unit_test_framework
+    preciceCore
     )
   set_target_properties(testprecice PROPERTIES
-    # precice is a C++14 project
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED Yes
     CXX_EXTENSIONS No
     )
@@ -404,18 +433,6 @@ IF (BUILD_TESTING)
     ${preCICE_SOURCE_DIR}/src
     ${preCICE_SOURCE_DIR}/tests
     )
-  # Copy needed properties from the lib to the executatble. This is necessary as
-  # this executable uses the library source, not only the interface.
-  copy_target_property(precice testprecice COMPILE_DEFINITIONS)
-  copy_target_property(precice testprecice COMPILE_OPTIONS)
-
-  # Testprecice fully depends on MPI and PETSc.
-  if(PRECICE_MPICommunication)
-    target_link_libraries(testprecice PRIVATE MPI::MPI_CXX)
-  endif()
-  if(PRECICE_MPICommunication AND PRECICE_PETScMapping)
-    target_link_libraries(testprecice PRIVATE PETSc::PETSc)
-  endif()
 
   message(STATUS "Including test sources")
   # Test Sources Configuration
@@ -458,32 +475,8 @@ if(PRECICE_BUILD_TOOLS)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 
-  # Install the binprecice link for backwards compatibility
-  # TODO remove in 3.0.0
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/binprecice DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-  install(FILES ${preCICE_SOURCE_DIR}/tools/profiling/precice-events
+    install(FILES ${preCICE_SOURCE_DIR}/tools/profiling/precice-events
     DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
-
-if(BUILD_TESTING AND PRECICE_InstallTest)
-  # Install the testprecice target
-  install(TARGETS testprecice
-    EXPORT preciceTargets
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    )
-
-  # Install the resources necessary for the tests
-  install(DIRECTORY src
-    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/precice
-    FILES_MATCHING
-    PATTERN "*.xml"
-    )
-  install(DIRECTORY src/action/tests/
-    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/precice/src/action/tests
-    FILES_MATCHING
-    PATTERN "*.py"
-    )
 endif()
 
 # Install examples
@@ -531,9 +524,6 @@ find_program(GZIP_EXE gzip DOC "The gzip executable")
 if(GZIP_EXE)
   # Process manpages for binaries
   file(COPY docs/man/man1/precice-tools.1 DESTINATION packaging/man1)
-  if(PRECICE_InstallTest)
-    file(COPY docs/man/man1/testprecice.1 DESTINATION packaging/man1)
-  endif()
   file(GLOB PRECICE_MAN_PAGES "${PRECICE_PACKAGING_DIR}/man1/*.1")
   foreach(manpage ${PRECICE_MAN_PAGES})
     message(STATUS "Compressing manpage: ${manpage}")
@@ -550,12 +540,6 @@ else()
   install(DIRECTORY docs/man/man1
     DESTINATION ${CMAKE_INSTALL_MANDIR}
     )
-
-  if(BUILD_TESTING AND PRECICE_InstallTest)
-    install(FILES docs/man/man1/testprecice.1
-      DESTINATION share/man
-      )
-  endif()
 endif()
 
 # Configure the pkg-config file for the binary directory

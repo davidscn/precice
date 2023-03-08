@@ -2,7 +2,7 @@
 # This file lists all sources that will be compiles into the precice library
 #
 
-target_sources(precice
+target_sources(preciceCore
     PRIVATE
     ${CMAKE_BINARY_DIR}/src/precice/impl/versions.cpp
     ${CMAKE_BINARY_DIR}/src/precice/impl/versions.hpp
@@ -48,22 +48,18 @@ target_sources(precice
     src/action/RecorderAction.hpp
     src/action/ScaleByAreaAction.cpp
     src/action/ScaleByAreaAction.hpp
-    src/action/ScaleByDtAction.cpp
-    src/action/ScaleByDtAction.hpp
     src/action/SharedPointer.hpp
     src/action/SummationAction.cpp
     src/action/SummationAction.hpp
     src/action/config/ActionConfiguration.cpp
     src/action/config/ActionConfiguration.hpp
-    src/com/CommunicateBoundingBox.cpp
-    src/com/CommunicateBoundingBox.hpp
-    src/com/CommunicateMesh.cpp
-    src/com/CommunicateMesh.hpp
     src/com/Communication.cpp
     src/com/Communication.hpp
     src/com/CommunicationFactory.hpp
     src/com/ConnectionInfoPublisher.cpp
     src/com/ConnectionInfoPublisher.hpp
+    src/com/Extra.cpp
+    src/com/Extra.hpp
     src/com/MPICommunication.cpp
     src/com/MPICommunication.hpp
     src/com/MPIDirectCommunication.cpp
@@ -80,6 +76,10 @@ target_sources(precice
     src/com/MPISinglePortsCommunicationFactory.hpp
     src/com/Request.cpp
     src/com/Request.hpp
+    src/com/SerializedMesh.cpp
+    src/com/SerializedMesh.hpp
+    src/com/SerializedPartitioning.cpp
+    src/com/SerializedPartitioning.hpp
     src/com/SharedPointer.hpp
     src/com/SocketCommunication.cpp
     src/com/SocketCommunication.hpp
@@ -190,11 +190,11 @@ target_sources(precice
     src/mapping/Polation.hpp
     src/mapping/RadialBasisFctBaseMapping.hpp
     src/mapping/RadialBasisFctMapping.hpp
-    src/mapping/RadialBasisFctSolver.cpp
     src/mapping/RadialBasisFctSolver.hpp
     src/mapping/SharedPointer.hpp
     src/mapping/config/MappingConfiguration.cpp
     src/mapping/config/MappingConfiguration.hpp
+    src/mapping/config/MappingConfigurationTypes.hpp
     src/mapping/impl/BasisFunctions.hpp
     src/math/barycenter.cpp
     src/math/barycenter.hpp
@@ -275,6 +275,8 @@ target_sources(precice
     src/query/Index.hpp
     src/query/impl/RTreeAdapter.hpp
     src/time/SharedPointer.hpp
+    src/time/Storage.cpp
+    src/time/Storage.hpp
     src/time/Time.cpp
     src/time/Time.hpp
     src/time/Waveform.cpp
@@ -298,7 +300,6 @@ target_sources(precice
     src/utils/Parallel.hpp
     src/utils/Petsc.cpp
     src/utils/Petsc.hpp
-    src/utils/PointerVector.hpp
     src/utils/Statistics.hpp
     src/utils/String.cpp
     src/utils/String.hpp

@@ -12,9 +12,9 @@
 #include <vector>
 
 #include "PointToPointCommunication.hpp"
-#include "com/CommunicateMesh.hpp"
 #include "com/Communication.hpp"
 #include "com/CommunicationFactory.hpp"
+#include "com/Extra.hpp"
 #include "com/Request.hpp"
 #include "logging/LogMacros.hpp"
 #include "m2n/DistributedCommunication.hpp"
@@ -312,8 +312,8 @@ void PointToPointCommunication::acceptConnection(std::string const &acceptorName
   PRECICE_TRACE(acceptorName, requesterName);
   PRECICE_ASSERT(not isConnected(), "Already connected.");
 
-  mesh::Mesh::VertexDistribution &vertexDistribution = _mesh->getVertexDistribution();
-  mesh::Mesh::VertexDistribution  requesterVertexDistribution;
+  mesh::Mesh::VertexDistribution vertexDistribution = _mesh->getVertexDistribution();
+  mesh::Mesh::VertexDistribution requesterVertexDistribution;
 
   if (not utils::IntraComm::isSecondary()) {
     PRECICE_DEBUG("Exchange vertex distribution between both primary ranks");
@@ -332,6 +332,9 @@ void PointToPointCommunication::acceptConnection(std::string const &acceptorName
   utils::IntraComm::synchronize();
   Event e1("m2n.broadcastVertexDistributions");
   m2n::broadcast(vertexDistribution);
+  if (utils::IntraComm::isSecondary()) {
+    _mesh->setVertexDistribution(vertexDistribution);
+  }
   m2n::broadcast(requesterVertexDistribution);
   e1.stop();
 
@@ -438,8 +441,8 @@ void PointToPointCommunication::requestConnection(std::string const &acceptorNam
   PRECICE_TRACE(acceptorName, requesterName);
   PRECICE_ASSERT(not isConnected(), "Already connected.");
 
-  mesh::Mesh::VertexDistribution &vertexDistribution = _mesh->getVertexDistribution();
-  mesh::Mesh::VertexDistribution  acceptorVertexDistribution;
+  mesh::Mesh::VertexDistribution vertexDistribution = _mesh->getVertexDistribution();
+  mesh::Mesh::VertexDistribution acceptorVertexDistribution;
 
   if (not utils::IntraComm::isSecondary()) {
     PRECICE_DEBUG("Exchange vertex distribution between both primary ranks");
@@ -459,6 +462,9 @@ void PointToPointCommunication::requestConnection(std::string const &acceptorNam
   utils::IntraComm::synchronize();
   Event e1("m2n.broadcastVertexDistributions");
   m2n::broadcast(vertexDistribution);
+  if (utils::IntraComm::isSecondary()) {
+    _mesh->setVertexDistribution(vertexDistribution);
+  }
   m2n::broadcast(acceptorVertexDistribution);
   e1.stop();
 
@@ -634,7 +640,7 @@ void PointToPointCommunication::receive(precice::span<double> itemsToReceive, in
   }
 }
 
-void PointToPointCommunication::broadcastSend(const int &itemToSend)
+void PointToPointCommunication::broadcastSend(int itemToSend)
 {
   for (auto &connectionData : _connectionDataVector) {
     _communication->send(itemToSend, connectionData.remoteRank);
@@ -654,14 +660,14 @@ void PointToPointCommunication::broadcastReceiveAll(std::vector<int> &itemToRece
 void PointToPointCommunication::broadcastSendMesh()
 {
   for (auto &connectionData : _connectionDataVector) {
-    com::CommunicateMesh(_communication).sendMesh(*_mesh, connectionData.remoteRank);
+    com::sendMesh(*_communication, connectionData.remoteRank, *_mesh);
   }
 }
 
 void PointToPointCommunication::broadcastReceiveAllMesh()
 {
   for (auto &connectionData : _connectionDataVector) {
-    com::CommunicateMesh(_communication).receiveMesh(*_mesh, connectionData.remoteRank);
+    com::receiveMesh(*_communication, connectionData.remoteRank, *_mesh);
   }
 }
 

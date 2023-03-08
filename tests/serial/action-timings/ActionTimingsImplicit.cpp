@@ -17,7 +17,6 @@ BOOST_AUTO_TEST_CASE(ActionTimingsImplicit)
 {
   PRECICE_TEST("SolverOne"_on(1_rank), "SolverTwo"_on(1_rank));
 
-  using namespace precice::constants;
   using namespace precice;
 
   SolverInterface interface(context.name, context.config(), context.rank, context.size);
@@ -26,8 +25,6 @@ BOOST_AUTO_TEST_CASE(ActionTimingsImplicit)
   std::string meshName;
   std::string writeDataName;
   std::string readDataName;
-  std::string writeIterCheckpoint(constants::actionWriteIterationCheckpoint());
-  std::string readIterCheckpoint(constants::actionReadIterationCheckpoint());
   double      writeValue;
 
   if (context.isNamed("SolverOne")) {
@@ -50,6 +47,15 @@ BOOST_AUTO_TEST_CASE(ActionTimingsImplicit)
 
   double dt = -1;
   BOOST_TEST(action::RecorderAction::records.empty());
+  action::RecorderAction::reset();
+  std::vector<double> writeData(dimensions, writeValue);
+  std::vector<double> readData(dimensions, -1);
+
+  if (interface.requiresInitialData()) {
+    BOOST_TEST(context.isNamed("SolverTwo"));
+    interface.writeVectorData(writeDataID, vertexID, writeData.data());
+  }
+
   dt = interface.initialize();
   BOOST_TEST(dt == 1.0);
   if (context.isNamed("SolverOne")) {
@@ -61,42 +67,15 @@ BOOST_AUTO_TEST_CASE(ActionTimingsImplicit)
     BOOST_TEST(action::RecorderAction::records.at(1).timing == action::Action::READ_MAPPING_POST);
   }
   action::RecorderAction::reset();
-  std::vector<double> writeData(dimensions, writeValue);
-  std::vector<double> readData(dimensions, -1);
-  const std::string & cowid = actionWriteInitialData();
-
-  if (interface.isActionRequired(cowid)) {
-    BOOST_TEST(context.isNamed("SolverTwo"));
-    interface.writeVectorData(writeDataID, vertexID, writeData.data());
-    interface.markActionFulfilled(cowid);
-  }
-
-  interface.initializeData();
-  if (context.isNamed("SolverOne")) {
-    BOOST_TEST(action::RecorderAction::records.size() == 2);
-    BOOST_TEST(action::RecorderAction::records.at(0).timing == action::Action::WRITE_MAPPING_PRIOR);
-    BOOST_TEST(action::RecorderAction::records.at(1).timing == action::Action::WRITE_MAPPING_POST);
-  } else {
-    BOOST_TEST(context.isNamed("SolverTwo"));
-    BOOST_TEST(action::RecorderAction::records.size() == 4);
-    BOOST_TEST(action::RecorderAction::records.at(0).timing == action::Action::WRITE_MAPPING_PRIOR);
-    BOOST_TEST(action::RecorderAction::records.at(1).timing == action::Action::WRITE_MAPPING_POST);
-    BOOST_TEST(action::RecorderAction::records.at(2).timing == action::Action::READ_MAPPING_PRIOR);
-    BOOST_TEST(action::RecorderAction::records.at(3).timing == action::Action::READ_MAPPING_POST);
-  }
-  action::RecorderAction::reset();
-
   int iteration = 0;
 
   while (interface.isCouplingOngoing()) {
     interface.readVectorData(readDataID, vertexID, readData.data());
     interface.writeVectorData(writeDataID, vertexID, writeData.data());
-    if (interface.isActionRequired(writeIterCheckpoint)) {
-      interface.markActionFulfilled(writeIterCheckpoint);
+    if (interface.requiresWritingCheckpoint()) {
     }
     dt = interface.advance(dt);
-    if (interface.isActionRequired(readIterCheckpoint)) {
-      interface.markActionFulfilled(readIterCheckpoint);
+    if (interface.requiresReadingCheckpoint()) {
     }
     if (interface.isTimeWindowComplete()) {
       iteration++;

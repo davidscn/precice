@@ -14,15 +14,13 @@
 #include "xml/ConfigParser.hpp"
 #include "xml/XMLAttribute.hpp"
 
-namespace precice {
-namespace mesh {
+namespace precice::mesh {
 
 MeshConfiguration::MeshConfiguration(
     xml::XMLTag &        parent,
     PtrDataConfiguration config)
     : TAG("mesh"),
       ATTR_NAME("name"),
-      ATTR_FLIP_NORMALS("flip-normals"),
       TAG_DATA("use-data"),
       ATTR_SIDE_INDEX("side"),
       _dimensions(0),
@@ -34,18 +32,15 @@ MeshConfiguration::MeshConfiguration(
   using namespace xml;
   std::string doc;
   XMLTag      tag(*this, TAG, xml::XMLTag::OCCUR_ONCE_OR_MORE);
-  doc = "Surface mesh consisting of vertices and (optional) of edges and ";
-  doc += "triangles (only in 3D). The vertices of a mesh can carry data, ";
-  doc += "configured by tag <use-data>. The mesh coordinates have to be ";
-  doc += "defined by a participant (see tag <use-mesh>).";
+  doc = "Surface mesh consisting of vertices and optional connectivity information. "
+        "The vertices of a mesh can carry data, "
+        "configured by tags <use-data>. The mesh coordinates have to be "
+        "defined by a participant (see tag <provide-mesh>).";
   tag.setDocumentation(doc);
 
   auto attrName = XMLAttribute<std::string>(ATTR_NAME)
                       .setDocumentation("Unique name for the mesh.");
   tag.addAttribute(attrName);
-
-  auto attrFlipNormals = makeXMLAttribute(ATTR_FLIP_NORMALS, false).setDocumentation("Deprecated.");
-  tag.addAttribute(attrFlipNormals);
 
   XMLTag subtagData(*this, TAG_DATA, XMLTag::OCCUR_ARBITRARY);
   doc = "Assigns a before defined data set (see tag <data>) to the mesh.";
@@ -73,12 +68,6 @@ void MeshConfiguration::xmlTagCallback(
   if (tag.getName() == TAG) {
     PRECICE_ASSERT(_dimensions != 0);
     std::string name = tag.getStringAttributeValue(ATTR_NAME);
-    if (tag.getBooleanAttributeValue(ATTR_FLIP_NORMALS)) {
-      PRECICE_WARN("You used the attribute \"{}\" when configuring mesh \"\". "
-                   "This attribute is deprecated and will be removed in the next major release. "
-                   "Please remove the attribute to silence this warning.",
-                   ATTR_FLIP_NORMALS, name);
-    }
     PRECICE_ASSERT(_meshIdManager);
     _meshes.push_back(std::make_shared<Mesh>(name, _dimensions, _meshIdManager->getFreeID()));
   } else if (tag.getName() == TAG_DATA) {
@@ -169,5 +158,4 @@ void MeshConfiguration::addNeededMesh(
   }
 }
 
-} // namespace mesh
-} // namespace precice
+} // namespace precice::mesh

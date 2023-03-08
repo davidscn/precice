@@ -23,22 +23,19 @@ int main(int argc, char **argv)
   const char *writeDataName;
   const char *readDataName;
 
-  const char *configFileName  = argv[1];
-  const char *participantName = argv[2];
-
   if (argc != 3) {
-    printf("Usage: ./solverdummy configFile solverName\n\n");
+    printf("The solverdummy was called with an incorrect number of arguments. Usage: ./solverdummy configFile solverName\n\n");
     printf("Parameter description\n");
     printf("  configurationFile: Path and filename of preCICE configuration\n");
     printf("  solverName:        SolverDummy participant name in preCICE configuration\n");
     return 1;
   }
 
+  const char *configFileName  = argv[1];
+  const char *participantName = argv[2];
+
   printf("DUMMY: Running solver dummy with preCICE config file \"%s\" and participant name \"%s\".\n",
          configFileName, participantName);
-
-  const char *writeItCheckp = precicec_actionWriteIterationCheckpoint();
-  const char *readItCheckp  = precicec_actionReadIterationCheckpoint();
 
   precicec_createSolverInterface(participantName, configFileName, solverProcessIndex, solverProcessSize);
 
@@ -75,32 +72,30 @@ int main(int argc, char **argv)
 
   free(vertices);
 
+  if (precicec_requiresInitialData()) {
+    printf("DUMMY: Writing initial data\n");
+  }
+
   dt = precicec_initialize();
 
   while (precicec_isCouplingOngoing()) {
 
-    if (precicec_isActionRequired(writeItCheckp)) {
+    if (precicec_requiresWritingCheckpoint()) {
       printf("DUMMY: Writing iteration checkpoint \n");
-      precicec_markActionFulfilled(writeItCheckp);
     }
 
-    if (precicec_isReadDataAvailable) {
-      precicec_readBlockVectorData(readDataID, numberOfVertices, vertexIDs, readData);
-    }
+    precicec_readBlockVectorData(readDataID, numberOfVertices, vertexIDs, readData);
 
     for (int i = 0; i < numberOfVertices * dimensions; i++) {
       writeData[i] = readData[i] + 1;
     }
 
-    if (precicec_isWriteDataRequired(dt)) {
-      precicec_writeBlockVectorData(writeDataID, numberOfVertices, vertexIDs, writeData);
-    }
+    precicec_writeBlockVectorData(writeDataID, numberOfVertices, vertexIDs, writeData);
 
     dt = precicec_advance(dt);
 
-    if (precicec_isActionRequired(readItCheckp)) {
+    if (precicec_requiresReadingCheckpoint()) {
       printf("DUMMY: Reading iteration checkpoint \n");
-      precicec_markActionFulfilled(readItCheckp);
     } else {
       printf("DUMMY: Advancing in time \n");
     }

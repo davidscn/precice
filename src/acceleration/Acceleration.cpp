@@ -2,8 +2,7 @@
 #include "cplscheme/CouplingData.hpp"
 #include "utils/Helpers.hpp"
 
-namespace precice {
-namespace acceleration {
+namespace precice::acceleration {
 
 void Acceleration::checkDataIDs(const DataMap &cplData) const
 {
@@ -15,5 +14,20 @@ void Acceleration::checkDataIDs(const DataMap &cplData) const
 #endif
 }
 
-} // namespace acceleration
-} // namespace precice
+void Acceleration::applyRelaxation(double omega, const DataMap &cplData) const
+{
+  for (const DataMap::value_type &pair : cplData) {
+    const auto  couplingData = pair.second;
+    auto &      values       = couplingData->values();
+    const auto &oldValues    = couplingData->previousIteration();
+    values *= omega;
+    values += oldValues * (1 - omega);
+    if (couplingData->hasGradient()) {
+      auto &      gradients    = couplingData->gradientValues();
+      const auto &oldGradients = couplingData->previousIterationGradients();
+      gradients *= omega;
+      gradients += oldGradients * (1 - omega);
+    }
+  }
+}
+} // namespace precice::acceleration

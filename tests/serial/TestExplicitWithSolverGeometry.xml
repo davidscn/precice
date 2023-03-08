@@ -13,34 +13,32 @@
       <use-data name="Displacements" />
     </mesh>
 
-    <mesh name="SolverGeometry" flip-normals="inside">
+    <mesh name="SolverGeometry">
       <use-data name="Forces" />
       <use-data name="Velocities" />
       <use-data name="Displacements" />
     </mesh>
 
     <participant name="SolverOne">
-      <use-mesh name="MeshOne" provide="yes" />
-      <use-mesh name="SolverGeometry" from="SolverTwo" />
+      <provide-mesh name="MeshOne" />
+      <receive-mesh name="SolverGeometry" from="SolverTwo" />
       <mapping:nearest-neighbor
         direction="write"
         from="MeshOne"
         to="SolverGeometry"
-        constraint="conservative"
-        timing="initial" />
+        constraint="conservative" />
       <mapping:nearest-neighbor
         direction="read"
         from="SolverGeometry"
         to="MeshOne"
-        constraint="consistent"
-        timing="initial" />
+        constraint="consistent" />
       <write-data name="Forces" mesh="MeshOne" />
       <read-data name="Velocities" mesh="MeshOne" />
       <read-data name="Displacements" mesh="MeshOne" />
     </participant>
 
     <participant name="SolverTwo">
-      <use-mesh name="SolverGeometry" provide="yes" />
+      <provide-mesh name="SolverGeometry" />
       <write-data name="Displacements" mesh="SolverGeometry" />
       <write-data name="Velocities" mesh="SolverGeometry" />
       <read-data name="Forces" mesh="SolverGeometry" />
