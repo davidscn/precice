@@ -345,15 +345,6 @@ double SolverInterfaceImpl::initialize()
   for (auto &context : _accessor->readDataContexts()) {
     context.initializeWaveform();
   }
-
-  if (_couplingScheme->hasDataBeenReceived()) {
-    performDataActions({action::Action::READ_MAPPING_PRIOR}, 0.0, 0.0, 0.0, dt);
-    mapReadData();
-    performDataActions({action::Action::READ_MAPPING_POST}, 0.0, 0.0, 0.0, dt);
-  }
-
-  PRECICE_INFO(_couplingScheme->printCouplingState());
-
   _meshLock.lockAll();
 
   if (_couplingScheme->sendsInitializedData()) {
@@ -375,7 +366,6 @@ double SolverInterfaceImpl::initialize()
   for (auto &context : _accessor->readDataContexts()) {
     context.moveToNextWindow();
   }
-
   _couplingScheme->receiveResultOfFirstAdvance();
 
   if (_couplingScheme->hasDataBeenReceived()) {
