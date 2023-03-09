@@ -1,15 +1,16 @@
 #include "profiling/Event.hpp"
 #include "profiling/EventUtils.hpp"
+#include "utils/IntraComm.hpp"
 #include "utils/assertion.hpp"
 
 namespace precice::profiling {
 
-Event::Event(std::string eventName, bool fundamental, bool autostart)
-    : _fundamental(fundamental)
+Event::Event(std::string eventName, Options options)
+    : _fundamental(options.fundamental), _synchronize(options.synchronized)
 {
   auto &er = EventRegistry::instance();
   _eid     = er.nameToID(EventRegistry::instance().prefix + eventName);
-  if (autostart) {
+  if (options.autostart) {
     start();
   }
 }
@@ -23,6 +24,9 @@ Event::~Event()
 
 void Event::start()
 {
+  if (_synchronize) {
+    ::precice::utils::IntraComm::synchronize();
+  }
   auto timestamp = Clock::now();
   PRECICE_ASSERT(_state == State::STOPPED, _eid);
   _state = State::RUNNING;

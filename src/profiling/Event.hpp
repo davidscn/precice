@@ -9,8 +9,20 @@ namespace precice::profiling {
 struct FundamentalTag {
 };
 
+/// Tag to annotate autostarted events
+struct AutostartTag {
+};
+
+/// Tag to annotate synchronized events
+struct SynchronizeTag {
+};
+
 /// Convenience instance of the @ref FundamentalTag
 static constexpr FundamentalTag Fundamental{};
+/// Convenience instance of the @ref AutostartTag
+static constexpr AutostartTag Autostart{};
+/// Convenience instance of the @ref SynchronizeTag
+static constexpr SynchronizeTag Synchronize{};
 
 /** Represents an event that can be started and stopped.
  *
@@ -31,11 +43,40 @@ public:
   /// Name used to identify the timer. Events of the same name are accumulated to
   std::string name;
 
-  /// Creates a new event and starts it, unless autostart = false
-  Event(std::string eventName, bool autostart = true)
-      : Event(std::move(eventName), false, autostart) {}
-  Event(std::string eventName, FundamentalTag, bool autostart = true)
-      : Event(std::move(eventName), true, autostart) {}
+  struct Options {
+    bool autostart    = false;
+    bool synchronized = false;
+    bool fundamental  = false;
+
+    void handle(FundamentalTag)
+    {
+      fundamental = true;
+    }
+    void handle(SynchronizeTag)
+    {
+      synchronized = true;
+    }
+    void handle(AutostartTag)
+    {
+      autostart = true;
+    }
+  };
+
+  template <typename... Args>
+  Options optionsFromTags(Args... args)
+  {
+    Options options;
+    (options.handle(args), ...);
+    return options;
+  }
+
+  template <typename... Args>
+  Event(std::string eventName, Args... args)
+      : Event(std::move(eventName), optionsFromTags(args...))
+  {
+  }
+
+  Event(std::string eventName, Options options);
 
   Event(Event &&) = default;
   Event &operator=(Event &&) = default;
@@ -57,11 +98,10 @@ public:
   void addData(const std::string &key, int value);
 
 private:
-  Event(std::string eventName, bool fundamental, bool autostart);
-
   int   _eid;
   State _state = State::STOPPED;
   bool  _fundamental{false};
+  bool  _synchronize{false};
 };
 
 /// Class that changes the prefix in its scope
