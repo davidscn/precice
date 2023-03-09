@@ -8,6 +8,11 @@ import argparse
 import os
 
 
+def mergedDict(dict1, dict2):
+    merged = dict1.copy()
+    merged.update(dict2)
+    return merged
+
 def requireModules(modules):
     import importlib
     notFound = [m for m in modules if importlib.util.find_spec(m) is None]
@@ -197,7 +202,7 @@ def groupEvents(events, initTime, nameIDOffset):
             completed.append(begin)
 
     return [
-        e | {"eid": e["eid"]+nameIDOffset}
+        mergedDict(e, {"eid": e["eid"]+nameIDOffset})
         for e in sorted(completed, key=lambda e: e["ts"])
     ]
 
@@ -216,7 +221,7 @@ def loadEventFile(filename, nameIDs):
                    if e["et"] == "n"
                    }
 
-    allNames = loadedNames | nameIDs
+    allNames = mergedDict(loadedNames, nameIDs)
 
     instanceData = {
         "meta": {
@@ -245,7 +250,7 @@ def mergeDuplicateNames(contents, eventIDs):
 
     for rank in contents:
         rank["events"] = [
-            e | {"eid": idMap[e["eid"]]}
+            mergedDict(e, {"eid": idMap[e["eid"]]})
             for e in rank["events"]
         ]
 
@@ -350,7 +355,8 @@ class Run:
             pid, tid = pids[rank.name], rank.rank
             for e in rank.events:
                 en = self.lookupEvent(e["eid"])
-                mainEvents.append({
+                mainEvents.append(
+                    mergedDict({
                     "name": en,
                     "cat": "Solver" if en.startswith("solver") else "preCICE",
                     "ph": "X",  # complete event
@@ -358,7 +364,7 @@ class Run:
                     "tid": tid,
                     "ts": e["ts"],
                     "dur": e["dur"]
-                } | {} if "data" not in e else {"args": e["data"]})
+                }, {} if "data" not in e else {"args": e["data"]}))
 
         return {"traceEvents": metaEvents + mainEvents}
 
@@ -586,7 +592,7 @@ def mergeCommand(files, outfile, align):
             resolved.append(path)
         if os.path.isdir(path):
             import glob
-            detected = glob.glob("precice-*-*-*.json", root_dir=path)
+            detected = glob.glob(os.path.join(path, "precice-*-*-*.json"))
             print(f"Autodetected {len(detected)} files in {path}")
             resolved += [os.path.join(path, p) for p in detected]
         else:
