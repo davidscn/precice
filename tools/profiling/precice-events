@@ -62,7 +62,7 @@ def ns_to_unit(obj, unit):
 
 
 def alignEvents(events):
-    """Alignes passed events of multiple ranks and or participants.
+    """Aligns passed events of multiple ranks and or participants.
     All ranks of a participant align at initialization, ensured by a barrier in preCICE.
     Primary ranks of all participants align after successfully establishing primary connections.
     """

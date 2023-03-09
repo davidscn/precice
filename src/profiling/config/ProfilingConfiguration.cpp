@@ -24,7 +24,7 @@ ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
 
   auto attrFlush = makeXMLAttribute<int>("flush-every", 50)
                        .setDocumentation("Set the amount of events that should be kept in memory before flushing them to file. "
-                                         "0 will only write at the end of the programm. "
+                                         "0 will only write at the end of the program. "
                                          "1 will write event directly to file. "
                                          "Everything larger than 1 will write events in blocks (recommended)");
   tag.addAttribute(attrFlush);

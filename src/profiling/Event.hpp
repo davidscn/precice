@@ -47,7 +47,7 @@ public:
   /// Stops the event if it's running and report its times to the EventRegistry
   ~Event();
 
-  /// Starts or restarts a stoped event.
+  /// Starts or restarts a stopped event.
   void start();
 
   /// Stops a running event.

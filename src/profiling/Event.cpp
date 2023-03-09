@@ -1,5 +1,4 @@
 #include "profiling/Event.hpp"
-#include <sys/eventfd.h>
 #include "profiling/EventUtils.hpp"
 #include "utils/assertion.hpp"
 
