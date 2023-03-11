@@ -212,7 +212,7 @@ void SolverInterfaceImpl::configure(
 {
   PRECICE_TRACE();
 
-  profiling::EventRegistry::instance().initialize(_accessorName, "precice", _accessorProcessRank, _accessorCommunicatorSize);
+  profiling::EventRegistry::instance().initialize(_accessorName, _accessorProcessRank, _accessorCommunicatorSize);
   Event e("configure", profiling::Fundamental);
 
   _meshLock.clear();

@@ -1,4 +1,5 @@
 #include "profiling/config/ProfilingConfiguration.hpp"
+#include <boost/filesystem/path.hpp>
 #include "logging/LogMacros.hpp"
 #include "profiling/EventUtils.hpp"
 #include "utils/assertion.hpp"
@@ -29,6 +30,11 @@ ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
                                          "Everything larger than 1 will write events in blocks (recommended)");
   tag.addAttribute(attrFlush);
 
+  auto attrDirectory = makeXMLAttribute<std::string>("directory", "..")
+                           .setDocumentation("Directory to use as a root directory to  write the events to. "
+                                             "Events will be written to `<directory>/precice-run/events/`");
+  tag.addAttribute(attrDirectory);
+
   parent.addSubtag(tag);
 }
 
@@ -38,6 +44,7 @@ void ProfilingConfiguration::xmlTagCallback(
 {
   auto mode       = tag.getStringAttributeValue("mode");
   auto flushEvery = tag.getIntAttributeValue("flush-every");
+  auto directory  = tag.getStringAttributeValue("directory");
   PRECICE_CHECK(flushEvery >= 0, "You configured the profiling to flush-every=\"{}\", which is invalid. "
                                  "Please choose a number >= 0.");
 
@@ -45,6 +52,7 @@ void ProfilingConfiguration::xmlTagCallback(
   auto &er = profiling::EventRegistry::instance();
 
   er.setWriteQueueMax(flushEvery);
+  er.setDirectory(boost::filesystem::path(directory).concat({"precice-run", "events"}).string());
 
   if (mode == "off") {
     er.setMode(profiling::Mode::Off);

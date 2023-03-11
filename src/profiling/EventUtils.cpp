@@ -49,12 +49,11 @@ EventRegistry &EventRegistry::instance()
   return instance;
 }
 
-void EventRegistry::initialize(std::string directory, std::string applicationName, int rank, int size)
+void EventRegistry::initialize(std::string applicationName, int rank, int size)
 {
   auto initClock = Event::Clock::now();
   auto initTime  = std::chrono::system_clock::now();
 
-  this->_directory       = std::move(directory);
   this->_applicationName = std::move(applicationName);
   this->_rank            = rank;
   this->_size            = size;
@@ -72,6 +71,11 @@ void EventRegistry::initialize(std::string directory, std::string applicationNam
 void EventRegistry::setWriteQueueMax(std::size_t size)
 {
   _writeQueueMax = size;
+}
+
+void EventRegistry::setDirectory(std::string directory)
+{
+  _directory = directory;
 }
 
 void EventRegistry::setMode(Mode mode)

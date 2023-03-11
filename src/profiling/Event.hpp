@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <string>
+#include <type_traits>
 
 namespace precice::profiling {
 
@@ -23,6 +24,10 @@ static constexpr FundamentalTag Fundamental{};
 static constexpr AutostartTag Autostart{};
 /// Convenience instance of the @ref SynchronizeTag
 static constexpr SynchronizeTag Synchronize{};
+
+// Is the type a valid options tag?
+template <typename T>
+static constexpr bool isOptionsTag = std::is_same_v<T, FundamentalTag> || std::is_same_v<T, AutostartTag> || std::is_same_v<T, SynchronizeTag>;
 
 /** Represents an event that can be started and stopped.
  *
@@ -63,8 +68,9 @@ public:
   };
 
   template <typename... Args>
-  Options optionsFromTags(Args... args)
+  constexpr Options optionsFromTags(Args... args)
   {
+    static_assert((isOptionsTag<Args> && ...), "The Event only accepts tags as arguments.");
     Options options;
     (options.handle(args), ...);
     return options;

@@ -90,15 +90,17 @@ public:
 
   /// Sets the global start time
   /**
-   * @param[in] directory the directory of the output file
    * @param[in] applicationName A name that is added to the logfile to distinguish different participants
    * @param[in] rank the current number of the parallel instance
    * @param[in] size the total number of a parallel instances
    */
-  void initialize(std::string directory, std::string applicationName, int rank = 0, int size = 1);
+  void initialize(std::string applicationName, int rank = 0, int size = 1);
 
   /// Sets the maximum size of the writequeue before calling flush(). Use 0 to flush on destruction.
   void setWriteQueueMax(std::size_t size);
+
+  /// Sets the directory where to write the event files to
+  void setDirectory(std::string directory);
 
   /// Sets the operational mode of the registry.
   void setMode(Mode mode);
