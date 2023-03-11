@@ -1,5 +1,6 @@
 #include "profiling/config/ProfilingConfiguration.hpp"
 #include <boost/filesystem/path.hpp>
+#include <cstdlib>
 #include "logging/LogMacros.hpp"
 #include "profiling/EventUtils.hpp"
 #include "utils/assertion.hpp"
@@ -44,7 +45,7 @@ void ProfilingConfiguration::xmlTagCallback(
 {
   auto mode       = tag.getStringAttributeValue("mode");
   auto flushEvery = tag.getIntAttributeValue("flush-every");
-  auto directory  = tag.getStringAttributeValue("directory");
+  auto directory  = boost::filesystem::path(tag.getStringAttributeValue("directory"));
   PRECICE_CHECK(flushEvery >= 0, "You configured the profiling to flush-every=\"{}\", which is invalid. "
                                  "Please choose a number >= 0.");
 
@@ -52,7 +53,9 @@ void ProfilingConfiguration::xmlTagCallback(
   auto &er = profiling::EventRegistry::instance();
 
   er.setWriteQueueMax(flushEvery);
-  er.setDirectory(boost::filesystem::path(directory).concat({"precice-run", "events"}).string());
+  directory /= "precice-run";
+  directory /= "events";
+  er.setDirectory(directory.string());
 
   if (mode == "off") {
     er.setMode(profiling::Mode::Off);
