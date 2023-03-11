@@ -35,9 +35,8 @@ void NearestNeighborBaseMapping::computeMapping()
   PRECICE_ASSERT(input().get() != nullptr);
   PRECICE_ASSERT(output().get() != nullptr);
 
-  const std::string baseEvent = "map." + mappingNameShort + ".computeMapping.From" + input()->getName() + "To" + output()->getName();
-  utils::IntraComm::synchronize();
-  precice::profiling::Event e(baseEvent);
+  const std::string         baseEvent = "map." + mappingNameShort + ".computeMapping.From" + input()->getName() + "To" + output()->getName();
+  precice::profiling::Event e(baseEvent, profiling::Synchronize);
 
   // Setup Direction of Mapping
   mesh::PtrMesh origins, searchSpace;
@@ -109,8 +108,7 @@ void NearestNeighborBaseMapping::onMappingComputed(mesh::PtrMesh origins, mesh::
 void NearestNeighborBaseMapping::tagMeshFirstRound()
 {
   PRECICE_TRACE();
-  utils::IntraComm::synchronize();
-  precice::profiling::Event e("map." + mappingNameShort + ".tagMeshFirstRound.From" + input()->getName() + "To" + output()->getName());
+  precice::profiling::Event e("map." + mappingNameShort + ".tagMeshFirstRound.From" + input()->getName() + "To" + output()->getName(), profiling::Synchronize);
 
   computeMapping();
 

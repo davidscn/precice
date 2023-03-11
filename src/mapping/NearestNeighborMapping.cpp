@@ -30,8 +30,7 @@ NearestNeighborMapping::NearestNeighborMapping(
 void NearestNeighborMapping::mapConservative(DataID inputDataID, DataID outputDataID)
 {
   PRECICE_TRACE(inputDataID, outputDataID);
-  utils::IntraComm::synchronize();
-  precice::profiling::Event e("map." + mappingNameShort + ".mapData.From" + input()->getName() + "To" + output()->getName());
+  precice::profiling::Event e("map." + mappingNameShort + ".mapData.From" + input()->getName() + "To" + output()->getName(), profiling::Synchronize);
   PRECICE_DEBUG("Map conservative");
 
   const Eigen::VectorXd &inputValues  = input()->data(inputDataID)->values();
@@ -58,8 +57,7 @@ void NearestNeighborMapping::mapConservative(DataID inputDataID, DataID outputDa
 void NearestNeighborMapping::mapConsistent(DataID inputDataID, DataID outputDataID)
 {
   PRECICE_TRACE(inputDataID, outputDataID);
-  utils::IntraComm::synchronize();
-  precice::profiling::Event e("map." + mappingNameShort + ".mapData.From" + input()->getName() + "To" + output()->getName());
+  precice::profiling::Event e("map." + mappingNameShort + ".mapData.From" + input()->getName() + "To" + output()->getName(), profiling::Synchronize);
   PRECICE_DEBUG((hasConstraint(CONSISTENT) ? "Map consistent" : "Map scaled-consistent"));
 
   const Eigen::VectorXd &inputValues  = input()->data(inputDataID)->values();

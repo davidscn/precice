@@ -48,8 +48,7 @@ void ReceivedPartition::communicate()
   // for two-level initialization, receive mesh partitions
   if (m2n().usesTwoLevelInitialization()) {
     PRECICE_INFO("Receive mesh partitions for mesh {}", _mesh->getName());
-    utils::IntraComm::synchronize();
-    Event e("partition.receiveMeshPartitions." + _mesh->getName());
+    Event e("partition.receiveMeshPartitions." + _mesh->getName(), profiling::Synchronize);
 
     if (utils::IntraComm::isPrimary()) {
       // Primary rank receives remote mesh's global number of vertices
@@ -67,8 +66,7 @@ void ReceivedPartition::communicate()
   } else {
     // for one-level initialization receive complete mesh on primary rank
     PRECICE_INFO("Receive global mesh {}", _mesh->getName());
-    utils::IntraComm::synchronize();
-    Event e("partition.receiveGlobalMesh." + _mesh->getName());
+    Event e("partition.receiveGlobalMesh." + _mesh->getName(), profiling::Synchronize);
 
     if (not utils::IntraComm::isSecondary()) {
       // a ReceivedPartition can only have one communication, @todo nicer design
@@ -161,8 +159,7 @@ void ReceivedPartition::compute()
 
   // (5) Filter mesh according to tag
   PRECICE_INFO("Filter mesh {} by mappings", _mesh->getName());
-  utils::IntraComm::synchronize();
-  Event      e5("partition.filterMeshMappings" + _mesh->getName());
+  Event      e5("partition.filterMeshMappings" + _mesh->getName(), profiling::Synchronize);
   mesh::Mesh filteredMesh("FilteredMesh", _dimensions, mesh::Mesh::MESH_ID_UNDEFINED);
   mesh::filterMesh(filteredMesh, *_mesh, [&](const mesh::Vertex &v) { return v.isTagged(); });
   PRECICE_DEBUG("Mapping filter, filtered from {} to {} vertices, {} to {} edges, and {} to {} triangles.",
@@ -178,8 +175,7 @@ void ReceivedPartition::compute()
   if (m2n().usesTwoLevelInitialization()) {
 
     PRECICE_INFO("Compute communication map for mesh {}", _mesh->getName());
-    utils::IntraComm::synchronize();
-    Event e6("partition.computeCommunicationMap." + _mesh->getName());
+    Event e6("partition.computeCommunicationMap." + _mesh->getName(), profiling::Synchronize);
 
     // Fill two data structures: remoteCommunicationMap and this rank's communication map (_mesh->getCommunicationMap()).
     // remoteCommunicationMap: connectedRank -> {remote local vertex index}
@@ -204,8 +200,7 @@ void ReceivedPartition::compute()
   } else {
 
     PRECICE_INFO("Feedback distribution for mesh {}", _mesh->getName());
-    utils::IntraComm::synchronize();
-    Event e6("partition.feedbackMesh." + _mesh->getName());
+    Event e6("partition.feedbackMesh." + _mesh->getName(), profiling::Synchronize);
     if (utils::IntraComm::isSecondary()) {
       int                   numberOfVertices = _mesh->vertices().size();
       std::vector<VertexID> vertexIDs(numberOfVertices, -1);
@@ -304,8 +299,7 @@ void ReceivedPartition::filterByBoundingBox()
 
     PRECICE_ASSERT(not m2n().usesTwoLevelInitialization());
     PRECICE_INFO("Pre-filter mesh {} by bounding box on primary rank", _mesh->getName());
-    utils::IntraComm::synchronize();
-    Event e("partition.preFilterMesh." + _mesh->getName());
+    Event e("partition.preFilterMesh." + _mesh->getName(), profiling::Synchronize);
 
     if (utils::IntraComm::isSecondary()) {
       PRECICE_DEBUG("Send bounding box to primary rank");
@@ -349,8 +343,7 @@ void ReceivedPartition::filterByBoundingBox()
   } else {
     if (not m2n().usesTwoLevelInitialization()) {
       PRECICE_INFO("Broadcast mesh {}", _mesh->getName());
-      utils::IntraComm::synchronize();
-      Event e("partition.broadcastMesh." + _mesh->getName());
+      Event e("partition.broadcastMesh." + _mesh->getName(), profiling::Synchronize);
 
       if (utils::IntraComm::isSecondary()) {
         com::broadcastReceiveMesh(*utils::IntraComm::getCommunication(), *_mesh);
@@ -362,8 +355,7 @@ void ReceivedPartition::filterByBoundingBox()
     if (_geometricFilter == ON_SECONDARY_RANKS) {
 
       PRECICE_INFO("Filter mesh {} by bounding box on secondary ranks", _mesh->getName());
-      utils::IntraComm::synchronize();
-      Event e("partition.filterMeshBB." + _mesh->getName());
+      Event e("partition.filterMeshBB." + _mesh->getName(), profiling::Synchronize);
 
       mesh::Mesh filteredMesh("FilteredMesh", _dimensions, mesh::Mesh::MESH_ID_UNDEFINED);
       mesh::filterMesh(filteredMesh, *_mesh, [&](const mesh::Vertex &v) { return _bb.contains(v); });
@@ -533,8 +525,7 @@ void ReceivedPartition::prepareBoundingBox()
 void ReceivedPartition::createOwnerInformation()
 {
   PRECICE_TRACE();
-  utils::IntraComm::synchronize();
-  Event e("partition.createOwnerInformation." + _mesh->getName());
+  Event e("partition.createOwnerInformation." + _mesh->getName(), profiling::Synchronize);
 
   /*
     We follow different approaches for two-level and one-level methods. For 1LI, a centeralized

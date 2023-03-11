@@ -32,9 +32,8 @@ LinearCellInterpolationMapping::LinearCellInterpolationMapping(
 void LinearCellInterpolationMapping::computeMapping()
 {
   PRECICE_TRACE(input()->vertices().size(), output()->vertices().size());
-  const std::string baseEvent = "map.vci.computeMapping.From" + input()->getName() + "To" + output()->getName();
-  utils::IntraComm::synchronize();
-  precice::profiling::Event e(baseEvent);
+  const std::string         baseEvent = "map.vci.computeMapping.From" + input()->getName() + "To" + output()->getName();
+  precice::profiling::Event e(baseEvent, profiling::Synchronize);
 
   // Setup Direction of Mapping
   mesh::PtrMesh origins, searchSpace;

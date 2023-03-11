@@ -56,8 +56,7 @@ void NearestNeighborGradientMapping::onMappingComputed(mesh::PtrMesh origins, me
 void NearestNeighborGradientMapping::mapConsistent(DataID inputDataID, DataID outputDataID)
 {
   PRECICE_TRACE(inputDataID, outputDataID);
-  utils::IntraComm::synchronize();
-  precice::profiling::Event e("map." + mappingNameShort + ".mapData.From" + input()->getName() + "To" + output()->getName());
+  precice::profiling::Event e("map." + mappingNameShort + ".mapData.From" + input()->getName() + "To" + output()->getName(), profiling::Synchronize);
 
   PRECICE_ASSERT(input()->data(inputDataID)->hasGradient(), "Mesh \"{}\" does not contain gradient data. Using Nearest Neighbor Gradient requires gradient data.",
                  input()->getName());

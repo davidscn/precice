@@ -44,8 +44,7 @@ void M2N::acceptPrimaryRankConnection(
 {
   PRECICE_TRACE(acceptorName, requesterName);
 
-  utils::IntraComm::synchronize();
-  Event e("m2n.acceptPrimaryRankConnection." + requesterName, profiling::Fundamental);
+  Event e("m2n.acceptPrimaryRankConnection." + requesterName, profiling::Fundamental, profiling::Synchronize);
 
   if (not utils::IntraComm::isSecondary()) {
     PRECICE_DEBUG("Accept primary connection");
@@ -63,8 +62,7 @@ void M2N::requestPrimaryRankConnection(
 {
   PRECICE_TRACE(acceptorName, requesterName);
 
-  utils::IntraComm::synchronize();
-  Event e("m2n.requestPrimaryRankConnection." + acceptorName, profiling::Fundamental);
+  Event e("m2n.requestPrimaryRankConnection." + acceptorName, profiling::Fundamental, profiling::Synchronize);
 
   if (not utils::IntraComm::isSecondary()) {
     PRECICE_ASSERT(_intraComm);
@@ -82,8 +80,7 @@ void M2N::acceptSecondaryRanksConnection(
 {
   PRECICE_TRACE(acceptorName, requesterName);
   PRECICE_ASSERT(not _useOnlyPrimaryCom);
-  utils::IntraComm::synchronize();
-  Event e("m2n.acceptSecondaryRanksConnection");
+  Event e("m2n.acceptSecondaryRanksConnection", profiling::Synchronize);
 
   _areSecondaryRanksConnected = true;
   for (const auto &pair : _distComs) {
@@ -100,8 +97,7 @@ void M2N::requestSecondaryRanksConnection(
 {
   PRECICE_TRACE(acceptorName, requesterName);
   PRECICE_ASSERT(not _useOnlyPrimaryCom);
-  utils::IntraComm::synchronize();
-  Event e("m2n.requestSecondaryRanksConnection");
+  Event e("m2n.requestSecondaryRanksConnection", profiling::Synchronize);
 
   _areSecondaryRanksConnected = true;
   for (const auto &pair : _distComs) {
@@ -227,8 +223,7 @@ void M2N::send(
       _intraComm->send(ack, 0);
     }
 
-    utils::IntraComm::synchronize();
-    Event e("m2n.sendData");
+    Event e("m2n.sendData", profiling::Synchronize);
 
     _distComs[meshID]->send(itemsToSend, valueDimension);
   } else {
@@ -302,8 +297,7 @@ void M2N::receive(precice::span<double> itemsToReceive,
       }
     }
 
-    utils::IntraComm::synchronize();
-    Event e("m2n.receiveData");
+    Event e("m2n.receiveData", profiling::Synchronize);
 
     _distComs[meshID]->receive(itemsToReceive, valueDimension);
   } else {

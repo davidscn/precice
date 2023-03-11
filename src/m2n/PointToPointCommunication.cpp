@@ -329,8 +329,7 @@ void PointToPointCommunication::acceptConnection(std::string const &acceptorName
   }
 
   PRECICE_DEBUG("Broadcast vertex distributions");
-  utils::IntraComm::synchronize();
-  Event e1("m2n.broadcastVertexDistributions");
+  Event e1("m2n.broadcastVertexDistributions", profiling::Synchronize);
   m2n::broadcast(vertexDistribution);
   if (utils::IntraComm::isSecondary()) {
     _mesh->setVertexDistribution(vertexDistribution);
@@ -355,8 +354,7 @@ void PointToPointCommunication::acceptConnection(std::string const &acceptorName
   //   the remote process with rank 1;
   // - has to communicate (send/receive) data with local indices 0 and 2 with
   //   the remote process with rank 4.
-  utils::IntraComm::synchronize();
-  Event                           e2("m2n.buildCommunicationMap");
+  Event                           e2("m2n.buildCommunicationMap", profiling::Synchronize);
   std::map<int, std::vector<int>> communicationMap = m2n::buildCommunicationMap(
       vertexDistribution, requesterVertexDistribution);
   e2.stop();
@@ -459,8 +457,7 @@ void PointToPointCommunication::requestConnection(std::string const &acceptorNam
   }
 
   PRECICE_DEBUG("Broadcast vertex distributions");
-  utils::IntraComm::synchronize();
-  Event e1("m2n.broadcastVertexDistributions");
+  Event e1("m2n.broadcastVertexDistributions", profiling::Synchronize);
   m2n::broadcast(vertexDistribution);
   if (utils::IntraComm::isSecondary()) {
     _mesh->setVertexDistribution(vertexDistribution);
@@ -485,8 +482,7 @@ void PointToPointCommunication::requestConnection(std::string const &acceptorNam
   //   the remote process with rank 1;
   // - has to communicate (send/receive) data with local indices 0 and 2 with
   //   the remote process with rank 4.
-  utils::IntraComm::synchronize();
-  Event                           e2("m2n.buildCommunicationMap");
+  Event                           e2("m2n.buildCommunicationMap", profiling::Synchronize);
   std::map<int, std::vector<int>> communicationMap = m2n::buildCommunicationMap(
       vertexDistribution, acceptorVertexDistribution);
   e2.stop();
