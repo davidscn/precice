@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 
+#include "logging/Logger.hpp"
 #include "profiling/Event.hpp"
 #include "utils/assertion.hpp"
 
@@ -89,12 +90,12 @@ public:
 
   /// Sets the global start time
   /**
+   * @param[in] directory the directory of the output file
    * @param[in] applicationName A name that is added to the logfile to distinguish different participants
-   * @param[in] filePrefix A prefix for the file name.
    * @param[in] rank the current number of the parallel instance
    * @param[in] size the total number of a parallel instances
    */
-  void initialize(std::string applicationName, std::string filePrefix = "", int rank = 0, int size = 1);
+  void initialize(std::string directory, std::string applicationName, int rank = 0, int size = 1);
 
   /// Sets the maximum size of the writequeue before calling flush(). Use 0 to flush on destruction.
   void setWriteQueueMax(std::size_t size);
@@ -129,8 +130,7 @@ private:
   /// The name of the current participant
   std::string _applicationName;
 
-  /// The optional file prefix, may be empty
-  std::string _prefix;
+  std::string _directory;
 
   /// The operational mode of the registry
   Mode _mode = Mode::Off;
@@ -166,6 +166,8 @@ private:
 
   /// Stops the global event, flushes the buffers and closes the filestream
   void stopBackend();
+
+  logging::Logger _log{"Events"};
 };
 
 } // namespace precice::profiling

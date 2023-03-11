@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <boost/filesystem/operations.hpp>
 #include <cassert>
 #include <ctime>
 #include <fstream>
@@ -12,6 +13,7 @@
 #include <tuple>
 #include <utility>
 
+#include "logging/LogMacros.hpp"
 #include "profiling/Event.hpp"
 #include "profiling/EventUtils.hpp"
 #include "utils/assertion.hpp"
@@ -47,13 +49,13 @@ EventRegistry &EventRegistry::instance()
   return instance;
 }
 
-void EventRegistry::initialize(std::string applicationName, std::string filePrefix, int rank, int size)
+void EventRegistry::initialize(std::string directory, std::string applicationName, int rank, int size)
 {
   auto initClock = Event::Clock::now();
   auto initTime  = std::chrono::system_clock::now();
 
+  this->_directory       = std::move(directory);
   this->_applicationName = std::move(applicationName);
-  this->_prefix          = std::move(filePrefix);
   this->_rank            = rank;
   this->_size            = size;
   this->_initTime        = initTime;
@@ -80,15 +82,22 @@ void EventRegistry::setMode(Mode mode)
 void EventRegistry::startBackend()
 {
   PRECICE_ASSERT(_mode != Mode::Off, "The profiling is off.")
-  if (_prefix.empty()) {
-    _output.open(fmt::format(
-        "{}-{}-{}.json",
-        _applicationName, _rank, _size));
-  } else {
-    _output.open(fmt::format(
-        "{}-{}-{}-{}.json",
-        _prefix, _applicationName, _rank, _size));
+  // Create the directory if necessary
+  bool isLocal = _directory.empty() || _directory == ".";
+  if (!isLocal) {
+    auto exists = boost::filesystem::exists(_directory);
+    PRECICE_CHECK(
+        !(exists && !boost::filesystem::create_directory(_directory)),
+        "The destination folder \"{}\" exists but isn't a directory. Please remove the directory \"precice-run\" and try again.",
+        _directory);
+    if (!exists) {
+      boost::filesystem::create_directory(_directory);
+    }
   }
+  auto filename = fmt::format("{}/{}-{}-{}.json", _directory, _applicationName, _rank, _size);
+  PRECICE_DEBUG("Starting backend with events-file: \"{}\"", filename);
+  _output.open(filename);
+  PRECICE_CHECK(_output, "Unable to open the events-file: \"{}\"", filename);
   _nameDict.emplace("_GLOBAL", 0);
 
   // write header
