@@ -91,11 +91,11 @@ void EventRegistry::startBackend()
   if (!isLocal) {
     auto exists = boost::filesystem::exists(_directory);
     PRECICE_CHECK(
-        !(exists && !boost::filesystem::create_directory(_directory)),
+        !(exists && !boost::filesystem::is_directory(_directory)),
         "The destination folder \"{}\" exists but isn't a directory. Please remove the directory \"precice-run\" and try again.",
         _directory);
     if (!exists) {
-      boost::filesystem::create_directory(_directory);
+      boost::filesystem::create_directories(_directory);
     }
   }
   auto filename = fmt::format("{}/{}-{}-{}.json", _directory, _applicationName, _rank, _size);
