@@ -10,8 +10,8 @@ namespace precice::profiling {
 struct FundamentalTag {
 };
 
-/// Tag to annotate autostarted events
-struct AutostartTag {
+/// Tag to annotate events that don't directly start
+struct InactiveTag {
 };
 
 /// Tag to annotate synchronized events
@@ -21,13 +21,13 @@ struct SynchronizeTag {
 /// Convenience instance of the @ref FundamentalTag
 static constexpr FundamentalTag Fundamental{};
 /// Convenience instance of the @ref AutostartTag
-static constexpr AutostartTag Autostart{};
+static constexpr InactiveTag Inactive{};
 /// Convenience instance of the @ref SynchronizeTag
 static constexpr SynchronizeTag Synchronize{};
 
 // Is the type a valid options tag?
 template <typename T>
-static constexpr bool isOptionsTag = std::is_same_v<T, FundamentalTag> || std::is_same_v<T, AutostartTag> || std::is_same_v<T, SynchronizeTag>;
+static constexpr bool isOptionsTag = std::is_same_v<T, FundamentalTag> || std::is_same_v<T, InactiveTag> || std::is_same_v<T, SynchronizeTag>;
 
 /** Represents an event that can be started and stopped.
  *
@@ -49,7 +49,7 @@ public:
   std::string name;
 
   struct Options {
-    bool autostart    = false;
+    bool autostart    = true;
     bool synchronized = false;
     bool fundamental  = false;
 
@@ -61,9 +61,9 @@ public:
     {
       synchronized = true;
     }
-    void handle(AutostartTag)
+    void handle(InactiveTag)
     {
-      autostart = true;
+      autostart = false;
     }
   };
 
