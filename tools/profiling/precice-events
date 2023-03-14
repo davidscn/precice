@@ -150,7 +150,7 @@ def alignEvents(events):
     return events
 
 
-def groupEvents(events, initTime, nameIDOffset):
+def groupEvents(events, initTime, nameMapping):
     completed = []
     active = {}  # name to event data
 
@@ -159,7 +159,7 @@ def groupEvents(events, initTime, nameIDOffset):
         if type == "n":
             continue
 
-        name = event["eid"]
+        name = nameMapping[event["eid"]]
         # Handle event starts
         if type == "b":
             # assert(name not in active.keys())
@@ -201,89 +201,54 @@ def groupEvents(events, initTime, nameIDOffset):
             begin.pop("et")
             completed.append(begin)
 
-    return [
-        mergedDict(e, {"eid": e["eid"]+nameIDOffset})
-        for e in sorted(completed, key=lambda e: e["ts"])
-    ]
-
-
-def loadEventFile(filename, nameIDs):
-    print(f"Loading events from {filename}")
-    json = readRobust(filename)
-
-    unix_us = int(json["meta"]["unix_us"])
-
-    nameIDOffset = len(nameIDs)
-
-    loadedNames = {int(e["eid"]) + nameIDOffset: e["en"]
-                   for e in json["events"]
-                   if e["et"] == "n"
-                   }
-
-    allNames = mergedDict(loadedNames, nameIDs)
-
-    instanceData = {
-        "meta": {
-            "name": json["meta"]["name"],
-            "rank": int(json["meta"]["rank"]),
-            "size": int(json["meta"]["size"]),
-            "unix_us": unix_us,
-            "tinit": json["meta"]["tinit"]
-        },
-        "events": groupEvents(json["events"], unix_us, nameIDOffset)
-    }
-
-    return (instanceData, allNames)
-
-
-def mergeDuplicateNames(contents, eventIDs):
-    # eventIDs is id -> name
-    uniqueEvents = {
-        name: id
-        for id, name in enumerate(set(eventIDs.values()))
-    }
-    idMap = {
-        oldid: uniqueEvents[name]
-        for oldid, name in eventIDs.items()
-    }
-
-    for rank in contents:
-        rank["events"] = [
-            mergedDict(e, {"eid": idMap[e["eid"]]})
-            for e in rank["events"]
-        ]
-
-    nameLookup = {id: name for name, id in uniqueEvents.items()}
-    assert (len(nameLookup) == len(uniqueEvents)), "Some events went missing"
-
-    return (contents, nameLookup)
+    return sorted(completed, key=lambda e: e["ts"])
 
 
 def loadEventFiles(filenames):
+    # Load all jsons
     print("Loading event files")
-    eventIDs = {}
-
-    contents = []
-    total = len(filenames)
+    jsons = []
     for i, fn in enumerate(filenames):
-        progress = int(float(i)/total*100)
-        print(f"├{progress:3}% ", end="")
-        idata, eventIDs = loadEventFile(fn, eventIDs)
-        contents.append(idata)
-    print("└ Merging duplicates names")
-    contents, eventIDs = mergeDuplicateNames(contents, eventIDs)
+        jsons.append(readRobust(fn))
 
-    pnames = set([data["meta"]["name"] for data in contents])
-    return {
-        "eventDict": eventIDs,
-        "events": {
-            pname: {
-                data["meta"]["rank"]: data
-                for data in contents
-                if data["meta"]["name"] == pname
-            }
-            for pname in pnames
+    # Get all names
+    print("Globalizing event names")
+    nameIDs = {} # name to global id
+    nameMappings = {} # participant -> localid -> globalid
+    for i, json in enumerate(jsons):
+        name = json["meta"]["name"]
+        rank = int(json["meta"]["rank"])
+        localNames = { int(e["eid"]): e["en"]
+                      for e in json["events"]
+                      if e["et"] == "n"}
+        for lid, n in localNames.items():
+            # get or create a global id for the name
+            gid = nameIDs.setdefault(n, len(nameIDs))
+            # register the local to global mapping
+            nameMappings.setdefault(name, {}).setdefault(rank, {}) .update({lid: gid})
+
+    # Grouping events
+    print("Grouping events")
+    events = {}
+    for i, json in enumerate(jsons):
+        name =  json["meta"]["name"]
+        rank= int(json["meta"]["rank"])
+        mapping = nameMappings[name][rank]
+        unix_us = int(json["meta"]["unix_us"])
+        events.setdefault(name, {})[rank] = {
+            "meta": {
+                "name": name,
+                "rank": rank,
+                "size": int(json["meta"]["size"]),
+                "unix_us": unix_us,
+                "tinit": json["meta"]["tinit"]
+            },
+            "events": groupEvents(json["events"], unix_us, mapping)
         }
+
+    return {
+        "eventDict":  { id: n for n, id in nameIDs.items()},
+        "events": events
     }
 
 
