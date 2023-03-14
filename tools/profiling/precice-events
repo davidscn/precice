@@ -209,8 +209,7 @@ def groupEvents(events, initTime, nameIDOffset):
 
 def loadEventFile(filename, nameIDs):
     print(f"Loading events from {filename}")
-    content = open(filename, "r").read()
-    json = loadRobust(content)
+    json = readRobust(filename)
 
     unix_us = int(json["meta"]["unix_us"])
 
