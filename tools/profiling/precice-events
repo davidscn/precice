@@ -6,6 +6,7 @@ import sys
 import datetime
 import argparse
 import os
+from collections import namedtuple
 
 
 def mergedDict(dict1, dict2):
@@ -81,7 +82,7 @@ def alignEvents(events):
         if len(ranks) == 1:
             continue
         print(f"Aligning {len(ranks)} ranks of {participant}")
-        intraSyncID = [id for name, id in events["eventDict"].items(
+        intraSyncID = [id for id, name in events["eventDict"].items(
         ) if name == "com.initializeIntraCom"][0]
         syncs = {rank: e["ts"]+e["dur"]
                  for rank, data in ranks.items()
@@ -91,7 +92,6 @@ def alignEvents(events):
 
         firstSync = min(syncs.values())
         shifts = {rank: firstSync-tp for rank, tp in syncs.items()}
-        print(shifts)
 
         for rank, data in ranks.items():
             for e in data["events"]:
@@ -261,13 +261,17 @@ def mergeDuplicateNames(contents, eventIDs):
 
 
 def loadEventFiles(filenames):
+    print("Loading event files")
     eventIDs = {}
 
     contents = []
-    for fn in filenames:
+    total = len(filenames)
+    for i, fn in enumerate(filenames):
+        progress = int(float(i)/total*100)
+        print(f"├{progress:3}% ", end="")
         idata, eventIDs = loadEventFile(fn, eventIDs)
         contents.append(idata)
-
+    print("└ Merging duplicates names")
     contents, eventIDs = mergeDuplicateNames(contents, eventIDs)
 
     pnames = set([data["meta"]["name"] for data in contents])
@@ -581,25 +585,101 @@ def compareCommand(eventfile, referencefile, participant, event, outfile=None, u
     return 0
 
 
-def mergeCommand(files, outfile, align):
+def detectFiles(files):
     # Default to loading from the local directory
     if not files:
         files = ["."]
+
+    def searchDir(directory):
+        assert os.path.isdir(directory)
+        import glob
+        return glob.glob(os.path.join(directory, "*-*-*.json"))
 
     resolved = []
     for path in files:
         if os.path.isfile(path):
             resolved.append(path)
+            continue
         if os.path.isdir(path):
-            import glob
-            detected = glob.glob(os.path.join(path, "precice-*-*-*.json"))
-            print(f"Autodetected {len(detected)} files in {path}")
-            resolved += [os.path.join(path, p) for p in detected]
-        else:
-            print(f"Not sure what do do with {path}")
-    resolved = list(set(resolved))
+            print(f"Searching {path} : ", end="")
+            candidates = [".",
+                          "precice-run/events",
+                          "events",
+                          "../precice-run/events",
+                          "../../precice-run/events",
+                          ]
+            found = False
+            for candidate in candidates:
+                dir = os.path.join(path, candidate)
+                if not os.path.isdir(dir):
+                    continue
+                detected = searchDir(dir)
+                if len(detected) == 0:
+                    continue
+                print(f"found {len(detected)} files in {dir}")
+                resolved += detected
+                found = True
+                break
 
-    merged = loadEventFiles(resolved)
+            if not found:
+                print(f"nothing found")
+
+        else:
+            print(f"Cannot interpret \"{path}\"")
+    unique = list(set(resolved))
+    print(f"Found {len(unique)} unique event files")
+    return unique
+
+
+def findFilesOfLatestRun(name, sizes):
+    assert len(sizes)>1
+    print(f"Found multiple runs for participant {name}")
+    timestamps = []
+    for size, ranks in sizes.items():
+        assert len(ranks) > 0
+        example = next(iter(ranks.values())) # Get some file of this run
+        timestamp = int(readRobust(example)["meta"]["unix_us"])
+        timestamps.append((size, timestamp))
+
+    # Find oldest size of newest timestamps
+    size, _ = max(timestamps, key=lambda p: p[1])
+    print(f"└ selected latest run of size {size}")
+
+    return list(sizes[size].values())
+
+def sanitizeFiles(files):
+    PieceFile = namedtuple("PieceFile", ["name", "rank", "size", "filename"])
+    def info(filename):
+        base = os.path.splitext(os.path.basename(filename))[0]
+        parts = base.split("-")
+        name = "-".join(parts[:-2])
+        return PieceFile(name, int(parts[-2]), int(parts[-1]) , filename)
+
+    pieces = [ info(filename) for filename in files ]
+
+    map = {}
+    for n, r, s, fn in pieces:
+        map.setdefault(n, {}).setdefault(s, {}).update({r: fn})
+
+    filesToLoad = []
+    for name, sizes in map.items():
+        if len(sizes) == 1:
+            print(f"Found a single run for participant {name}")
+            filesToLoad += [
+                filename
+                for _, ranks in sizes.items()
+                for filename in ranks.values()
+            ]
+            continue
+
+        filesToLoad = findFilesOfLatestRun(name, sizes)
+    return filesToLoad
+
+
+def mergeCommand(files, outfile, align):
+    resolved = detectFiles(files)
+    sanitized = sanitizeFiles(resolved)
+    merged = loadEventFiles(sanitized)
 
     if align:
         merged = alignEvents(merged)
@@ -676,12 +756,10 @@ if __name__ == '__main__':
     merge = subparsers.add_parser('merge',
                                   help=merge_help.splitlines()[0], description=merge_help)
     merge.add_argument("files", nargs="*",
-                       help="The event files to process, or nothing to autodetect")
+                       help="The event files to process, directories to search, or nothing to autodetect")
     merge.add_argument("-o", "--output", type=str, default="events.json",
                        help="The resulting event file.")
-    merge.add_argument("-a", "--align", type=bool,
-                       default=True, help="Align participants?")
-
+    merge.add_argument("-n", "--no-align", action="store_true", help="Don't align participants?")
     args = parser.parse_args()
 
     dispatcher = {
@@ -690,7 +768,7 @@ if __name__ == '__main__':
         "analyze": lambda ns: analyzeCommand(ns.eventfile, ns.participant, ns.output,  ns.unit),
         "compare": lambda ns: compareCommand(ns.eventfile, ns.referencefile, ns.participant, ns.event, ns.output,  ns.unit),
         "plot": lambda ns: plotCommand(ns.events.split(","), ns.eventfile,  ns.unit),
-        "merge": lambda ns: mergeCommand(ns.files, ns.output, ns.align)
+        "merge": lambda ns: mergeCommand(ns.files, ns.output, not ns.no_align)
     }
 
     def showHelp(ns):
