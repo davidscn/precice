@@ -679,7 +679,7 @@ if __name__ == '__main__':
     analyze.add_argument("-o", "--output",
                          help="Write the result to CSV file")
 
-    compare_help = "YOLO"
+    compare_help = "Compare two runs of the same participant."
     compare = subparsers.add_parser('compare',
                                     help=compare_help.splitlines()[0], description=compare_help)
     compare.add_argument("participant", type=str,
