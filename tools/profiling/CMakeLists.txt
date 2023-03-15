@@ -24,7 +24,7 @@ foreach(test IN LISTS _tests)
   # set(_test_out "${CMAKE_CURRENT_LIST_DIR}/tests/${test}/events.json")
   message(STATUS "Test ${_test_name}")
   add_test(NAME ${_test_name}
-    COMMAND ${_precice_events} merge ${_test_location}
+    COMMAND Python3::Interpreter ${_precice_events} merge ${_test_location}
     WORKING_DIRECTORY ${_test_wd}
     )
 endforeach(test)
