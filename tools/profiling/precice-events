@@ -183,7 +183,7 @@ def groupEvents(events, initTime, nameMapping):
         # Handle event data
         elif type == "d":
             if (name not in active.keys()):
-                print(f"!! {name} not yet active")
+                print(f"Dropping data event {name} as event isn't yet known.")
             else:
                 d = active[name].get("data", {})
                 d[event["dn"]] = int(event["dv"])
