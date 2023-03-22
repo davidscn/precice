@@ -26,8 +26,7 @@
 
 using precice::profiling::Event;
 
-namespace precice {
-namespace m2n {
+namespace precice::m2n {
 
 void send(mesh::Mesh::VertexDistribution const &m,
           int                                   rankReceiver,
@@ -699,5 +698,4 @@ void PointToPointCommunication::checkBufferedRequests(bool blocking)
   } while (blocking);
 }
 
-} // namespace m2n
-} // namespace precice
+} // namespace precice::m2n

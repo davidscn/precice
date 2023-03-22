@@ -26,8 +26,7 @@
 
 using precice::profiling::Event;
 
-namespace precice {
-namespace partition {
+namespace precice::partition {
 
 ReceivedPartition::ReceivedPartition(
     const mesh::PtrMesh &mesh, GeometricFilter geometricFilter, double safetyFactor, bool allowDirectAccess)
@@ -963,5 +962,4 @@ m2n::M2N &ReceivedPartition::m2n()
   return *_m2ns[0];
 }
 
-} // namespace partition
-} // namespace precice
+} // namespace precice::partition

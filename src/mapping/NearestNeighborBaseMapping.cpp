@@ -13,8 +13,7 @@
 #include "utils/Statistics.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace mapping {
+namespace precice::mapping {
 
 NearestNeighborBaseMapping::NearestNeighborBaseMapping(
     Constraint  constraint,
@@ -134,5 +133,4 @@ void NearestNeighborBaseMapping::tagMeshSecondRound()
   // for NN mapping no operation needed here
 }
 
-} // namespace mapping
-} // namespace precice
+} // namespace precice::mapping

@@ -20,8 +20,7 @@
 #include "utils/Statistics.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace mapping {
+namespace precice::mapping {
 
 NearestProjectionMapping::NearestProjectionMapping(
     Constraint constraint,
@@ -106,5 +105,4 @@ void NearestProjectionMapping::computeMapping()
   _hasComputedMapping = true;
 }
 
-} // namespace mapping
-} // namespace precice
+} // namespace precice::mapping

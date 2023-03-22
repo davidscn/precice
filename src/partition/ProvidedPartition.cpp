@@ -24,8 +24,7 @@
 
 using precice::profiling::Event;
 
-namespace precice {
-namespace partition {
+namespace precice::partition {
 
 ProvidedPartition::ProvidedPartition(
     mesh::PtrMesh mesh)
@@ -80,7 +79,7 @@ void ProvidedPartition::communicate()
     } else {
 
       if (not hasMeshBeenGathered) {
-        //Gather mesh
+        // Gather mesh
         Event e("partition.gatherMesh." + _mesh->getName(), profiling::Synchronize);
         if (not utils::IntraComm::isSecondary()) {
           globalMesh.addMesh(*_mesh); // Add local primary mesh to global mesh
@@ -345,5 +344,4 @@ void ProvidedPartition::compareBoundingBoxes()
   }
 }
 
-} // namespace partition
-} // namespace precice
+} // namespace precice::partition

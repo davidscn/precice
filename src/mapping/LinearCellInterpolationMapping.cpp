@@ -6,8 +6,7 @@
 #include "utils/Statistics.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace mapping {
+namespace precice::mapping {
 
 LinearCellInterpolationMapping::LinearCellInterpolationMapping(
     Constraint constraint,
@@ -120,5 +119,4 @@ void LinearCellInterpolationMapping::computeMapping()
   _hasComputedMapping = true;
 }
 
-} // namespace mapping
-} // namespace precice
+} // namespace precice::mapping

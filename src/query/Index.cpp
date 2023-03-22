@@ -10,8 +10,7 @@
 #include "query/Index.hpp"
 #include "query/impl/RTreeAdapter.hpp"
 
-namespace precice {
-namespace query {
+namespace precice::query {
 
 precice::logging::Logger Index::_log{"query::Index"};
 
@@ -342,5 +341,4 @@ void Index::clear()
   _pimpl->clear();
 }
 
-} // namespace query
-} // namespace precice
+} // namespace precice::query

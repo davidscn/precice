@@ -1,4 +1,3 @@
-
 #include <Eigen/Core>
 #include <algorithm>
 #include <memory>
@@ -20,8 +19,7 @@
 #include "utils/Statistics.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace mapping {
+namespace precice::mapping {
 
 BarycentricBaseMapping::BarycentricBaseMapping(Constraint constraint, int dimensions)
     : Mapping(constraint, dimensions)
@@ -142,5 +140,4 @@ void BarycentricBaseMapping::tagMeshSecondRound()
   // for NP mapping no operation needed here
 }
 
-} // namespace mapping
-} // namespace precice
+} // namespace precice::mapping

@@ -1,4 +1,3 @@
-
 #include "NearestNeighborGradientMapping.hpp"
 
 #include <Eigen/Core>
@@ -11,8 +10,7 @@
 #include "utils/IntraComm.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace mapping {
+namespace precice::mapping {
 
 NearestNeighborGradientMapping::NearestNeighborGradientMapping(
     Constraint constraint,
@@ -71,7 +69,7 @@ void NearestNeighborGradientMapping::mapConsistent(DataID inputDataID, DataID ou
   Eigen::VectorXd &      outputValues    = output()->data(outputDataID)->values();
   const Eigen::MatrixXd &gradientValues  = input()->data(inputDataID)->gradientValues();
 
-  //Consistent mapping
+  // Consistent mapping
   PRECICE_DEBUG((hasConstraint(CONSISTENT) ? "Map consistent" : "Map scaled-consistent"));
   const size_t outSize = output()->vertices().size();
 
@@ -95,5 +93,4 @@ void NearestNeighborGradientMapping::mapConservative(DataID /*inputDataID*/, Dat
   PRECICE_ASSERT(false, "Not implemented.")
 }
 
-} // namespace mapping
-} // namespace precice
+} // namespace precice::mapping

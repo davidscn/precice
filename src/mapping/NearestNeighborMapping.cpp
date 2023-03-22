@@ -10,8 +10,7 @@
 #include "utils/IntraComm.hpp"
 #include "utils/assertion.hpp"
 
-namespace precice {
-namespace mapping {
+namespace precice::mapping {
 
 NearestNeighborMapping::NearestNeighborMapping(
     Constraint constraint,
@@ -81,5 +80,4 @@ void NearestNeighborMapping::mapConsistent(DataID inputDataID, DataID outputData
   PRECICE_DEBUG("Mapped values = {}", utils::previewRange(3, outputValues));
 }
 
-} // namespace mapping
-} // namespace precice
+} // namespace precice::mapping
