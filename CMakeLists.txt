@@ -335,6 +335,7 @@ print_section("TARGETS & PACKAGES")
 # Core of preCICE bundling the sources and dependencies.
 # The main library and tests link against this.
 add_library(preciceCore OBJECT)
+ADD_DEFINITIONS(-DEIGEN_NO_CUDA)
 set_target_properties(preciceCore PROPERTIES
   CXX_STANDARD 17
   CXX_STANDARD_REQUIRED Yes
