@@ -249,53 +249,64 @@ endif()
 # Option: Ginkgo
 if (PRECICE_GinkgoParallelization)
 
-  # Check if CUDA is available on the system
-  include(CheckLanguage)
-  check_language(CUDA)
+  find_package(Ginkgo 1.5 REQUIRED)
+  message(STATUS "Found Ginkgo ${GINKGO_PROJECT_VERSION}")
 
-  # Enable CUDA if driver and libraries are available; otherwise it'll be ignored
-  if(CMAKE_CUDA_COMPILER)
-    enable_language(CUDA)
-    set(CMAKE_CUDA_STANDARD 17)
-    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-    set(CMAKE_CUDA_FLAGS "-lineinfo --allow-unsupported-compiler --use_fast_math --std=c++17 --expt-extended-lambda --expt-relaxed-constexpr -Xcompiler -fopenmp -Wall")
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-    set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-    message(STATUS "Enabled CUDA support for Ginkgo library.")
+  if(${GINKGO_BUILD_CUDA})
+     # Check if CUDA is available on the system
+     include(CheckLanguage)
+     check_language(CUDA)
 
-    add_compile_definitions("PRECICE_WITH_CUDA")
-
+      # Enable CUDA if driver and libraries are available; otherwise it'll be ignored
+      #  if(CMAKE_CUDA_COMPILER)
+      enable_language(CUDA)
+      # set(CMAKE_CUDA_ARCHITECTURES 80)
+      # set(CMAKE_CUDA_ARCHITECTURES ${GINKGO_CUDA_ARCHITECTURES})
+      set(CMAKE_CUDA_STANDARD 17)
+      set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+      set(CMAKE_CUDA_FLAGS "${GINKGO_CUDA_ARCH_FLAGS} --expt-relaxed-constexpr")
+      if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
+        SET(CMAKE_CUDA_ARCHITECTURES OFF)
+      endif()
+      #  set(CMAKE_CUDA_FLAGS "-lineinfo --allow-unsupported-compiler --use_fast_math --std=c++17 --expt-extended-lambda --expt-relaxed-constexpr -Xcompiler -fopenmp -Wall")
+      #  set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+      message(STATUS "Enabled CUDA support for Ginkgo library.")
+      #    endif()
   endif()
+  if(${GINKGO_BUILD_HIP})
+    if(NOT DEFINED HIP_PATH)
+        set(HIP_PATH "/opt/rocm/hip" CACHE PATH "Path to which HIP has been installed")
+     endif()
 
-  if(NOT DEFINED HIP_PATH)
-      set(HIP_PATH "/opt/rocm/hip" CACHE PATH "Path to which HIP has been installed")
-   endif()
+    if(NOT DEFINED ROCM_PATH)
+       set(ROCM_PATH "/opt/rocm" CACHE PATH "Path to which ROCM has been installed")
+    endif()
 
-  if(NOT DEFINED ROCM_PATH)
-     set(ROCM_PATH "/opt/rocm" CACHE PATH "Path to which ROCM has been installed")
-  endif()
+    if(NOT DEFINED HCC_PATH)
+        set(HCC_PATH "${ROCM_PATH}/hcc" CACHE PATH "Path to which HCC has been installed")
+    endif()
 
-  if(NOT DEFINED HCC_PATH)
-      set(HCC_PATH "${ROCM_PATH}/hcc" CACHE PATH "Path to which HCC has been installed")
-  endif()
+    if(NOT DEFINED HIP_CLANG_PATH)
+        set(HIP_CLANG_PATH "${ROCM_PATH}/llvm/bin" CACHE PATH "Path to which HIP compatible clang binaries have been installed")
+    endif()
 
-  if(NOT DEFINED HIP_CLANG_PATH)
-      set(HIP_CLANG_PATH "${ROCM_PATH}/llvm/bin" CACHE PATH "Path to which HIP compatible clang binaries have been installed")
-  endif()
+    find_package(HIP QUIET)
 
-  find_package(HIP QUIET)
+    if(HIP_FOUND)
+        set(CMAKE_MODULE_PATH "${HIP_PATH}/cmake" ${CMAKE_MODULE_PATH})
+        list(APPEND CMAKE_PREFIX_PATH
+        "${HIP_PATH}/lib/cmake"
+        "${HIP_PATH}/../lib/cmake"
+        )
 
-  if(HIP_FOUND)
-      set(CMAKE_MODULE_PATH "${HIP_PATH}/cmake" ${CMAKE_MODULE_PATH})
-      list(APPEND CMAKE_PREFIX_PATH
-     	"${HIP_PATH}/lib/cmake"
-      	"${HIP_PATH}/../lib/cmake"
-      )
+        include(${HIP_PATH}/cmake/FindHIP.cmake)
+        set_target_properties(hip::device PROPERTIES INTERFACE_COMPILE_OPTIONS "-fPIC")
+        set_target_properties(hip::device PROPERTIES INTERFACE_LINK_LIBRARIES "hip::host")
 
-      include(${HIP_PATH}/cmake/FindHIP.cmake)
+        set(CMAKE_HIP_FLAGS "-fPIC -Wno-deprecated-register -w -fgpu-rdc")
+        set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-      set_target_properties(hip::device PROPERTIES INTERFACE_COMPILE_OPTIONS "-fPIC")
-      set_target_properties(hip::device PROPERTIES INTERFACE_LINK_LIBRARIES "hip::host")
+        set(GINKGO_HIPCC_OPTIONS "-fPIC")
 
       set(CMAKE_HIP_FLAGS "-fPIC -Wno-deprecated-register -w -fgpu-rdc")
       set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -309,16 +320,13 @@ if (PRECICE_GinkgoParallelization)
       add_compile_definitions("PRECICE_WITH_HIP")
   endif()
 
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-
   include_directories(${EIGEN3_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fmt/include)
 
   # Check if OpenMP is available
-  find_package(OpenMP)
-  if(OpenMP_FOUND)
-    message(STATUS "Enabled OpenMP support for Ginkgo library.")
-  endif()
-
+  # find_package(OpenMP)
+  # if(OpenMP_FOUND)
+  #   message(STATUS "Enabled OpenMP support for Ginkgo library.")
+  # endif()
 endif()
 
 # Option Python
@@ -426,16 +434,20 @@ endif()
 
 # Setup Ginkgo
 if (PRECICE_GinkgoParallelization)
-  set(CMAKE_CXX_FLAGS "-fPIC")
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
   set(Ginkgo_Path "" CACHE STRING "Path to the experimental Ginkgo Repository of branch a195f856e.") # TODO: Remove as soon as GPU feature is in main branch
-  find_package(Ginkgo REQUIRED HINTS "${Ginkgo_Path}/build" NO_CMAKE_SYSTEM_PATH)
-  target_include_directories(preciceCore PUBLIC "${Ginkgo_Path}/include")
   include(${Ginkgo_Path}/cmake/unified_kernels.cmake)
-  file(GLOB ginkgo_lib "${Ginkgo_Path}/build/lib/*")
 
+  target_link_libraries(preciceCore PUBLIC Ginkgo::ginkgo cusolver cublas)
   # This command registers Ginkgo kernels for different execution backends
   ginkgo_add_unified_kernels(preciceCore src/mapping/ginkgo_kernels/GinkgoRBFKernels.cpp)
+
+  # shortcoming of the kernel registration: we need to add the mapping includes here to all targets
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+  set_target_properties(preciceCore_cuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(preciceCore_reference PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(preciceCore_hip PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(preciceCore_omp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(preciceCore_dpcpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
   # This compiles cuSolver or rocSOLVER into preCICE for GPU QR decomposition
   if(CMAKE_CUDA_COMPILER)
@@ -448,9 +460,9 @@ if (PRECICE_GinkgoParallelization)
     target_link_libraries(preciceCore PRIVATE preciceHIPQR)
     endif()
 
-  if(OpenMP_FOUND)
-    target_compile_options(preciceCore PUBLIC "-fopenmp")
-  endif()
+  # if(OpenMP_FOUND)
+  #   target_compile_options(preciceCore PUBLIC "-fopenmp")
+  # endif()
 else()
   target_compile_definitions(preciceCore PUBLIC PRECICE_NO_GINKGO)
 endif()
