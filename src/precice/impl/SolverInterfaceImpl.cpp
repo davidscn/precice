@@ -254,9 +254,6 @@ void SolverInterfaceImpl::configure(
 
   e.stop();
 
-  /// @todo make this block size configurable
-  profiling::EventRegistry::instance().setWriteQueueMax(1000);
-
   PRECICE_DEBUG("Initialize intra-participant communication");
   if (utils::IntraComm::isParallel()) {
     initializeIntraCommunication();
