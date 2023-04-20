@@ -519,33 +519,6 @@ def compareCommand(eventfile, referencefile, participant, event, outfile=None, u
                  ref_q, new_q,'r.')
         plt.show()
 
-
-    #all = df.groupby("eid").agg(
-    #    {"dur": [("min", "min"), ("mean", "mean"), ("max", "max"), ("sum", "sum"), ("count", "count")]})
-    #all.columns = all.columns.droplevel()
-
-    #isParallel = len(df["rank"].unique()) > 1
-    #if isParallel:
-    #    primary = df[df["rank"] == 0].groupby("eid").agg(
-    #        {"dur": [("Pmin", "min"), ("Pmean", "mean"), ("Pmax", "max"), ("Psum", "sum"), ("Pcount", "count")]})
-    #    secondaries = df[df["rank"] > 0].groupby("eid").agg(
-    #        {"dur": [("Smin", "min"), ("Smean", "mean"), ("Smax", "max"), ("Ssum", "sum"), ("Scount", "count")]})
-
-    #    primary.columns = primary.columns.droplevel()
-    #    secondaries.columns = secondaries.columns.droplevel()
-
-    #    joined = pandas.concat([all, primary, secondaries], axis=1)
-    #else:
-    #    joined = all
-
-    #joined = all
-
-    #joined.index.rename("event", inplace=True)
-    #printWide(joined)
-    #if (outfile):
-    #    print(f"Writing to {outfile}")
-    #    joined.to_csv(outfile)
-
     return 0
 
 
