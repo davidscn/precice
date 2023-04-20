@@ -204,9 +204,13 @@ void XMLTag::readAttributes(const std::map<std::string, std::string> &aAttribute
           pos != _attributeHints.end()) {
         PRECICE_ERROR("The tag <{}> in the configuration contains the attribute \"{}\". {}", _fullName, name, pos->second);
       }
+
       auto matches = utils::computeMatches(name, _attributes);
-      if (matches.front().distance < 3) {
-        PRECICE_ERROR("The tag <{}> in the configuration contains an unknown attribute \"{}\". Did you mean \"{}\"?", _fullName, name, matches.front().name);
+      if (!matches.empty() && matches.front().distance < 3) {
+        matches.erase(std::remove_if(matches.begin(), matches.end(), [](auto &m) { return m.distance > 2; }), matches.end());
+        std::vector<std::string> stringMatches;
+        std::transform(matches.begin(), matches.end(), std::back_inserter(stringMatches), [](auto &m) { return m.name; });
+        PRECICE_ERROR("The tag <{}> in the configuration contains an unknown attribute \"{}\". Did you mean \"{}\"?", _fullName, name, fmt::join(stringMatches, ", "));
       }
       PRECICE_ERROR("The tag <{}> in the configuration contains an unknown attribute \"{}\". Expected attributes are {}.", _fullName, name, fmt::join(_attributes, ", "));
     }
@@ -394,7 +398,7 @@ XMLTag getRootTag()
 void configure(
     XMLTag &                                  tag,
     const precice::xml::ConfigurationContext &context,
-    const std::string &                       configurationFilename)
+    std::string_view                          configurationFilename)
 {
   logging::Logger _log("xml");
   PRECICE_TRACE(tag.getFullName(), configurationFilename);
@@ -402,7 +406,7 @@ void configure(
   NoPListener nopListener;
   XMLTag      root(nopListener, "", XMLTag::OCCUR_ONCE);
 
-  precice::xml::ConfigParser p(configurationFilename, context, std::make_shared<XMLTag>(tag));
+  precice::xml::ConfigParser p(std::string(configurationFilename), context, std::make_shared<XMLTag>(tag));
 
   root.addSubtag(tag);
 }
