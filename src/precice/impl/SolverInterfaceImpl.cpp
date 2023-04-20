@@ -140,6 +140,8 @@ SolverInterfaceImpl::SolverInterfaceImpl(
                   _accessorCommunicatorSize, currentSize);
   }
 #endif
+
+  _solverInitEvent = std::make_unique<profiling::Event>("solver.initialize", profiling::Fundamental, profiling::Synchronize);
 }
 
 SolverInterfaceImpl::SolverInterfaceImpl(
@@ -259,8 +261,6 @@ void SolverInterfaceImpl::configure(
   if (utils::IntraComm::isParallel()) {
     initializeIntraCommunication();
   }
-
-  _solverInitEvent = std::make_unique<profiling::Event>("solver.initialize.preinit", profiling::Fundamental, profiling::Synchronize);
 }
 
 double SolverInterfaceImpl::initialize()
@@ -275,7 +275,7 @@ double SolverInterfaceImpl::initialize()
                 "Initial data has to be written to preCICE before calling initialize(). "
                 "After defining your mesh, call requiresInitialData() to check if the participant is required to write initial data using an appropriate write...Data() function.");
 
-  _solverInitEvent->stop();
+  _solverInitEvent->reset();
   Event                        e("initialize", profiling::Fundamental, profiling::Synchronize);
   profiling::ScopedEventPrefix sep("initialize/");
 
@@ -382,13 +382,14 @@ double SolverInterfaceImpl::initialize()
   _accessor->exportFinal();
   e.stop();
   sep.pop();
-  _solverInitEvent = std::make_unique<profiling::Event>("solver.initialize.postinit", profiling::Fundamental, profiling::Synchronize);
 
   _state = State::Initialized;
   PRECICE_INFO(_couplingScheme->printCouplingState());
 
   // determine dt at the very end of the method to get the final value, even if first participant method is used (see above).
   double dt = _couplingScheme->getNextTimestepMaxLength();
+
+  _solverAdvanceEvent = std::make_unique<profiling::Event>("solver.advance", profiling::Fundamental, profiling::Synchronize);
   return dt;
 }
 
@@ -399,13 +400,8 @@ double SolverInterfaceImpl::advance(
   PRECICE_TRACE(computedTimestepLength);
 
   // Events for the solver time, stopped when we enter, restarted when we leave advance
-  if (_solverInitEvent) {
-    _solverInitEvent->stop();
-    _solverInitEvent.reset();
-  }
-  if (_solverAdvanceEvent) {
-    _solverAdvanceEvent->stop();
-  }
+  PRECICE_ASSERT(_solverAdvanceEvent, "The advance event is created in initialize");
+  _solverAdvanceEvent->stop();
 
   Event                        e("advance", profiling::Fundamental, profiling::Synchronize);
   profiling::ScopedEventPrefix sep("advance/");
@@ -464,9 +460,6 @@ double SolverInterfaceImpl::advance(
 
   sep.pop();
   e.stop();
-  if (!_solverAdvanceEvent) {
-    _solverAdvanceEvent = std::make_unique<profiling::Event>("solver.advance", profiling::Fundamental, profiling::Synchronize, profiling::Inactive);
-  }
   _solverAdvanceEvent->start();
   return _couplingScheme->getNextTimestepMaxLength();
 }
@@ -477,9 +470,7 @@ void SolverInterfaceImpl::finalize()
   PRECICE_CHECK(_state != State::Finalized, "finalize() may only be called once.");
 
   // Events for the solver time, finally stopped here
-  if (_solverAdvanceEvent) {
-    _solverAdvanceEvent.reset();
-  }
+  _solverAdvanceEvent.reset();
 
   Event                        e("finalize", profiling::Fundamental);
   profiling::ScopedEventPrefix sep("finalize/");
