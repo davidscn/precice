@@ -6,6 +6,10 @@
 
 namespace precice::profiling {
 
+constexpr int         DEFAULT_SYNC_EVERY = 50;
+constexpr const char *DEFAULT_MODE       = "fundamental";
+constexpr const char *DEFAULT_DIRECTORY  = "..";
+
 /**
  * @brief Configuration class for exports.
  */
@@ -22,5 +26,7 @@ public:
 private:
   logging::Logger _log{"profiling::ProfilingConfiguration"};
 };
+
+void applyDefaults();
 
 } // namespace precice::profiling

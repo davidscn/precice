@@ -1,6 +1,7 @@
 #include "profiling/config/ProfilingConfiguration.hpp"
 #include <boost/filesystem/path.hpp>
 #include <cstdlib>
+#include <string_view>
 #include "logging/LogMacros.hpp"
 #include "profiling/EventUtils.hpp"
 #include "utils/assertion.hpp"
@@ -17,14 +18,14 @@ ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
   XMLTag tag(*this, "profiling", XMLTag::OCCUR_NOT_OR_ONCE);
   tag.setDocumentation("Allows configuring the profiling functionality of preCICE.");
 
-  auto attrMode = makeXMLAttribute<std::string>("mode", "off")
+  auto attrMode = makeXMLAttribute<std::string>("mode", DEFAULT_MODE)
                       .setOptions({"off", "fundamental", "all"})
                       .setDocumentation("Operational modes of the profiling. "
                                         "\"fundamental\" will only write fundamental events. "
                                         "\"all\" writes all events.");
   tag.addAttribute(attrMode);
 
-  auto attrFlush = makeXMLAttribute<int>("flush-every", 50)
+  auto attrFlush = makeXMLAttribute<int>("flush-every", DEFAULT_SYNC_EVERY)
                        .setDocumentation("Set the amount of event records that should be kept in memory before flushing them to file. "
                                          "One event consists out of multiple records."
                                          "0 keeps all records in memory and writes them at the end of the program, useful for slower network filesystems. "
@@ -32,13 +33,28 @@ ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
                                          "Settings greater than 1 keep records in memory and write them to file in blocks, which is recommended.");
   tag.addAttribute(attrFlush);
 
-  auto attrDirectory = makeXMLAttribute<std::string>("directory", "..")
+  auto attrDirectory = makeXMLAttribute<std::string>("directory", DEFAULT_DIRECTORY)
                            .setDocumentation("Directory to use as a root directory to  write the events to. "
                                              "Events will be written to `<directory>/precice-run/events/`");
   tag.addAttribute(attrDirectory);
 
   parent.addSubtag(tag);
 }
+
+namespace {
+profiling::Mode fromString(std::string_view mode)
+{
+  if (mode == "off") {
+    return profiling::Mode::Off;
+  } else if (mode == "fundamental") {
+    return profiling::Mode::Fundamental;
+  } else if (mode == "all") {
+    return profiling::Mode::All;
+  } else {
+    PRECICE_UNREACHABLE("Unknown mode \"{}\"", mode);
+  }
+}
+} // namespace
 
 void ProfilingConfiguration::xmlTagCallback(
     const xml::ConfigurationContext &context,
@@ -54,19 +70,26 @@ void ProfilingConfiguration::xmlTagCallback(
   auto &er = profiling::EventRegistry::instance();
 
   er.setWriteQueueMax(flushEvery);
+
   directory /= "precice-run";
   directory /= "events";
   er.setDirectory(directory.string());
 
-  if (mode == "off") {
-    er.setMode(profiling::Mode::Off);
-  } else if (mode == "fundamental") {
-    er.setMode(profiling::Mode::Fundamental);
-  } else if (mode == "all") {
-    er.setMode(profiling::Mode::All);
-  } else {
-    PRECICE_UNREACHABLE("Unknown mode \"{}\"", mode);
-  }
+  er.setMode(fromString(mode));
+}
+
+void applyDefaults()
+{
+  auto &er = profiling::EventRegistry::instance();
+
+  er.setWriteQueueMax(DEFAULT_SYNC_EVERY);
+
+  auto directory = boost::filesystem::path(DEFAULT_DIRECTORY);
+  directory /= "precice-run";
+  directory /= "events";
+  er.setDirectory(directory.string());
+
+  er.setMode(fromString(DEFAULT_MODE));
 }
 
 } // namespace precice::profiling

@@ -61,6 +61,7 @@
 #include "precice/types.hpp"
 #include "profiling/Event.hpp"
 #include "profiling/EventUtils.hpp"
+#include "profiling/config/ProfilingConfiguration.hpp"
 #include "utils/EigenHelperFunctions.hpp"
 #include "utils/EigenIO.hpp"
 #include "utils/Helpers.hpp"
@@ -215,6 +216,7 @@ void SolverInterfaceImpl::configure(
   PRECICE_TRACE();
 
   profiling::EventRegistry::instance().initialize(_accessorName, _accessorProcessRank, _accessorCommunicatorSize);
+  profiling::applyDefaults();
   Event e("configure", profiling::Fundamental);
 
   _meshLock.clear();
