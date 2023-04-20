@@ -15,20 +15,21 @@ ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
   using namespace xml;
 
   XMLTag tag(*this, "profiling", XMLTag::OCCUR_NOT_OR_ONCE);
-  tag.setDocumentation("Allows to configure the profiling functionality of preCICE.");
+  tag.setDocumentation("Allows configuring the profiling functionality of preCICE.");
 
   auto attrMode = makeXMLAttribute<std::string>("mode", "off")
                       .setOptions({"off", "fundamental", "all"})
-                      .setDocumentation("Operaitonal modes of the profiling. "
+                      .setDocumentation("Operational modes of the profiling. "
                                         "\"fundamental\" will only write fundamental events. "
                                         "\"all\" writes all events.");
   tag.addAttribute(attrMode);
 
   auto attrFlush = makeXMLAttribute<int>("flush-every", 50)
-                       .setDocumentation("Set the amount of events that should be kept in memory before flushing them to file. "
-                                         "0 will only write at the end of the program. "
-                                         "1 will write event directly to file. "
-                                         "Everything larger than 1 will write events in blocks (recommended)");
+                       .setDocumentation("Set the amount of event records that should be kept in memory before flushing them to file. "
+                                         "One event consists out of multiple records."
+                                         "0 keeps all records in memory and writes them at the end of the program, useful for slower network filesystems. "
+                                         "1 writes records directly to the file, useful to get profiling data despite program crashes. "
+                                         "Settings greater than 1 keep records in memory and write them to file in blocks, which is recommended.");
   tag.addAttribute(attrFlush);
 
   auto attrDirectory = makeXMLAttribute<std::string>("directory", "..")
