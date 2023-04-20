@@ -673,7 +673,7 @@ if __name__ == '__main__':
     trace.add_argument("-o", "--output", default="trace.json",
                        help="The resulting trace file")
 
-    export_help = "Exports the events as a CSV file."
+    export_help = "Export the events as a CSV file."
     export = subparsers.add_parser('export',
                                    help=export_help.splitlines()[0], description=export_help)
     export.add_argument("eventfile", nargs="?", type=str, default="events.json",
