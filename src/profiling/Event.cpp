@@ -10,9 +10,7 @@ Event::Event(std::string eventName, Options options)
 {
   auto &er = EventRegistry::instance();
   _eid     = er.nameToID(EventRegistry::instance().prefix + eventName);
-  if (options.autostart) {
-    start();
-  }
+  start();
 }
 
 Event::~Event()
