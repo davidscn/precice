@@ -18,9 +18,9 @@ set(_test_script "${CMAKE_CURRENT_LIST_DIR}/tests/simple-test.cmake")
 
 foreach(test IN LISTS _tests)
 
-  set(_test_name precice.events.merge.${test})
+  set(_test_name precice.tools.events.${test})
   set(_test_location "${CMAKE_CURRENT_LIST_DIR}/tests/${test}")
-  set(_test_wd "${CMAKE_CURRENT_BINARY_DIR}/tests/${test}")
+  set(_test_wd "${PROJECT_BINARY_DIR}/TestOutput/tools.events.${test}")
   file(MAKE_DIRECTORY ${_test_wd})
   message(STATUS "Test ${_test_name}")
   add_test(NAME ${_test_name}
