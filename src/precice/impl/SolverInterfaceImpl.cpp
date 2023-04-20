@@ -275,7 +275,7 @@ double SolverInterfaceImpl::initialize()
                 "Initial data has to be written to preCICE before calling initialize(). "
                 "After defining your mesh, call requiresInitialData() to check if the participant is required to write initial data using an appropriate write...Data() function.");
 
-  _solverInitEvent->reset();
+  _solverInitEvent.reset();
   Event                        e("initialize", profiling::Fundamental, profiling::Synchronize);
   profiling::ScopedEventPrefix sep("initialize/");
 
