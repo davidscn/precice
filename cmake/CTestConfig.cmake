@@ -26,7 +26,7 @@ mark_as_advanced(PRECICE_TEST_WRAPPER_SCRIPT)
 
 
 function(add_precice_test)
-  cmake_parse_arguments(PARSE_ARGV 0 PAT "PETSC;MPIPORTS" "NAME;ARGUMENTS;TIMEOUT;LABELS" "")
+  cmake_parse_arguments(PARSE_ARGV 0 PAT "PETSC;MPIPORTS;INTEGRATION" "NAME;ARGUMENTS;TIMEOUT;LABELS" "")
   # Check arguments
   if(NOT PAT_NAME)
     message(FATAL_ERROR "Argument NAME not passed")
@@ -53,6 +53,11 @@ function(add_precice_test)
     )
   # Generate working directory
   set(PAT_WDIR "${PRECICE_TEST_DIR}/${PAT_NAME}")
+  # Integration tests need an extra directory to simulate the directory shared between solvers
+  if (PAT_INTEGRATION)
+    set(PAT_WDIR "${PAT_WDIR}/inner")
+  endif()
+
   file(MAKE_DIRECTORY "${PAT_WDIR}")
   # Setting properties
   set_tests_properties(${PAT_FULL_NAME}
@@ -304,6 +309,7 @@ foreach(testsuite IN LISTS PRECICE_TEST_SUITES)
     NAME "integration.${testsuite}"
     ARGUMENTS "--run_test=Integration/${testsuite}"
     TIMEOUT ${PRECICE_TEST_TIMEOUT_LONG}
+    INTEGRATION
     )
 endforeach()
 
