@@ -17,7 +17,7 @@ hipError_t          cudaErrorCode = hipSuccess;
 // Important variables which track the state of the solver routines
 double *dTau    = nullptr;
 double *dWork   = nullptr;
-int    *devInfo = nullptr;
+int *   devInfo = nullptr;
 
 void initQRSolver(const int deviceId = 0)
 {
