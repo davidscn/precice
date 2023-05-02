@@ -66,7 +66,8 @@ void testMappingNearestProjection(bool defineEdgesExplicitly, bool useBulkFuncti
     }
 
     // Initialize, thus sending the mesh.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant should have to advance once!");
 
     // Write the data to be send.
@@ -94,7 +95,8 @@ void testMappingNearestProjection(bool defineEdgesExplicitly, bool useBulkFuncti
     int idC = interface.setMeshVertex(meshName, coordTwoC.data());
 
     // Initialize, thus receive the data and map.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
 
     // Read the mapped data from the mesh.
@@ -102,9 +104,9 @@ void testMappingNearestProjection(bool defineEdgesExplicitly, bool useBulkFuncti
     BOOST_TEST(!interface.requiresGradientDataFor(meshName, dataAID));
 
     double valueA, valueB, valueC;
-    interface.readScalarData(meshName, dataAID, idA, valueA);
-    interface.readScalarData(meshName, dataAID, idB, valueB);
-    interface.readScalarData(meshName, dataAID, idC, valueC);
+    interface.readScalarData(meshName, dataAID, idA, maxDt, valueA);
+    interface.readScalarData(meshName, dataAID, idB, maxDt, valueB);
+    interface.readScalarData(meshName, dataAID, idC, maxDt, valueC);
 
     BOOST_TEST(valueA == expectedValTwoA);
     BOOST_TEST(valueB == expectedValTwoB);
@@ -183,7 +185,8 @@ void testQuadMappingNearestProjection(bool defineEdgesExplicitly, bool useBulkFu
     BOOST_REQUIRE(mesh.triangles().size() == 2);
 
     // Initialize, thus sending the mesh.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(mesh.edges().size() == 5);
     BOOST_TEST(mesh.triangles().size() == 2);
 
@@ -212,15 +215,16 @@ void testQuadMappingNearestProjection(bool defineEdgesExplicitly, bool useBulkFu
     int idC = interface.setMeshVertex(meshName, coordTwoC.data());
 
     // Initialize, thus receive the data and map.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
 
     // Read the mapped data from the mesh.
     auto   dataAID = "DataOne";
     double valueA, valueB, valueC;
-    interface.readScalarData(meshName, dataAID, idA, valueA);
-    interface.readScalarData(meshName, dataAID, idB, valueB);
-    interface.readScalarData(meshName, dataAID, idC, valueC);
+    interface.readScalarData(meshName, dataAID, idA, maxDt, valueA);
+    interface.readScalarData(meshName, dataAID, idB, maxDt, valueB);
+    interface.readScalarData(meshName, dataAID, idC, maxDt, valueC);
 
     BOOST_TEST(valueA == expectedValTwoA);
     BOOST_TEST(valueB == expectedValTwoB);

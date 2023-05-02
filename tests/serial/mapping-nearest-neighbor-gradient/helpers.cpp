@@ -23,7 +23,8 @@ void testVectorGradientFunctions(const TestContext &context, const bool writeBlo
     interface.setMeshVertex(meshName, posTwo.data());
 
     // Initialize, thus sending the mesh.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant should have to advance once!");
 
     double values[6]  = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
@@ -46,7 +47,7 @@ void testVectorGradientFunctions(const TestContext &context, const bool writeBlo
     }
 
     // Participant must make move after writing
-    maxDt = interface.advance(maxDt);
+    interface.advance(maxDt);
 
     BOOST_TEST(!interface.isCouplingOngoing(), "Sending participant should have to advance once!");
     interface.finalize();
@@ -61,13 +62,14 @@ void testVectorGradientFunctions(const TestContext &context, const bool writeBlo
     interface.setMeshVertex(meshName, posOne.data());
     interface.setMeshVertex(meshName, posTwo.data());
 
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.requiresGradientDataFor(meshName, dataName) == false);
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
 
     double valueData[6];
     int    indices[2] = {0, 1};
-    interface.readBlockVectorData(meshName, dataName, 2, indices, valueData);
+    interface.readBlockVectorData(meshName, dataName, 2, indices, maxDt, valueData);
 
     std::vector<double> expected;
     expected = {1.6, 3.5, 5.4, 7.3, 9.2, 11.1};

@@ -49,7 +49,8 @@ void testQuadMappingScaledConsistent(const std::string configFile, const TestCon
     BOOST_REQUIRE(mesh.triangles().size() == 2);
 
     // Initialize, thus sending the mesh.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(mesh.edges().size() == 5);
     BOOST_TEST(mesh.triangles().size() == 2);
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant should have to advance once!");
@@ -79,15 +80,16 @@ void testQuadMappingScaledConsistent(const std::string configFile, const TestCon
     interface.setMeshTriangle(meshTwoID, idA, idB, idC);
 
     // Initialize, thus receive the data and map.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
 
     // Read the mapped data from the mesh.
     auto   dataAID = "DataOne";
     double valueA, valueB, valueC;
-    interface.readScalarData(meshTwoID, dataAID, idA, valueA);
-    interface.readScalarData(meshTwoID, dataAID, idB, valueB);
-    interface.readScalarData(meshTwoID, dataAID, idC, valueC);
+    interface.readScalarData(meshTwoID, dataAID, idA, maxDt, valueA);
+    interface.readScalarData(meshTwoID, dataAID, idB, maxDt, valueB);
+    interface.readScalarData(meshTwoID, dataAID, idC, maxDt, valueC);
 
     double calculatedIntegral = precice::math::geometry::triangleArea(coordTwoA, coordTwoB, coordTwoC) * (valueA + valueB + valueC) / 3.0;
     BOOST_TEST(expectedIntegral == calculatedIntegral);
@@ -144,7 +146,8 @@ void testQuadMappingScaledConsistentVolumetric(const std::string configFile, con
     BOOST_REQUIRE(mesh.triangles().size() == 3);
 
     // Initialize, thus sending the mesh.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant should have to advance once!");
 
     // Write the data to be send.
@@ -179,16 +182,17 @@ void testQuadMappingScaledConsistentVolumetric(const std::string configFile, con
     interface.setMeshTriangle(meshTwoID, idA, idD, idC);
 
     // Initialize, thus receive the data and map.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
 
     // Read the mapped data from the mesh.
     auto   dataAID = "DataOne";
     double valueA, valueB, valueC, valueD;
-    interface.readScalarData(meshTwoID, dataAID, idA, valueA);
-    interface.readScalarData(meshTwoID, dataAID, idB, valueB);
-    interface.readScalarData(meshTwoID, dataAID, idC, valueC);
-    interface.readScalarData(meshTwoID, dataAID, idD, valueD);
+    interface.readScalarData(meshTwoID, dataAID, idA, maxDt, valueA);
+    interface.readScalarData(meshTwoID, dataAID, idB, maxDt, valueB);
+    interface.readScalarData(meshTwoID, dataAID, idC, maxDt, valueC);
+    interface.readScalarData(meshTwoID, dataAID, idD, maxDt, valueD);
 
     double calculatedIntegral = precice::math::geometry::triangleArea(coordTwoA, coordTwoB, coordTwoC) * (valueA + valueB + valueC) / 3.0 +
                                 precice::math::geometry::triangleArea(coordTwoA, coordTwoD, coordTwoC) * (valueA + valueD + valueC) / 3.0;
@@ -246,7 +250,8 @@ void testTetraScaledConsistentVolumetric(const std::string configFile, const Tes
     BOOST_REQUIRE(mesh.tetrahedra().size() == 2);
 
     // Initialize, thus sending the mesh.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant should have to advance once!");
 
     // Write the data to be send.
@@ -276,16 +281,17 @@ void testTetraScaledConsistentVolumetric(const std::string configFile, const Tes
     interface.setMeshTetrahedron(meshTwoID, idA, idB, idC, idD);
 
     // Initialize, thus receive the data and map.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
 
     // Read the mapped data from the mesh.
     auto   dataAID = "DataOne";
     double valueA, valueB, valueC, valueD;
-    interface.readScalarData(meshTwoID, dataAID, idA, valueA);
-    interface.readScalarData(meshTwoID, dataAID, idB, valueB);
-    interface.readScalarData(meshTwoID, dataAID, idC, valueC);
-    interface.readScalarData(meshTwoID, dataAID, idD, valueD);
+    interface.readScalarData(meshTwoID, dataAID, idA, maxDt, valueA);
+    interface.readScalarData(meshTwoID, dataAID, idB, maxDt, valueB);
+    interface.readScalarData(meshTwoID, dataAID, idC, maxDt, valueC);
+    interface.readScalarData(meshTwoID, dataAID, idD, maxDt, valueD);
 
     double calculatedIntegral = precice::math::geometry::tetraVolume(coordTwoA, coordTwoB, coordTwoC, coordTwoD) * (valueA + valueB + valueC + valueD) / 4.0;
     BOOST_TEST(expectedIntegral == calculatedIntegral);

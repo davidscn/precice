@@ -82,8 +82,9 @@ BOOST_AUTO_TEST_CASE(TestBoundingBoxInitialization)
   interface.advance(1.0);
 
   if (context.isNamed("Structure")) {
+    double preciceDt = interface.getMaxTimeStepSize();
     for (size_t i = 0; i < vertexIDs.size(); i++) {
-      interface.readVectorData(meshName, forcesID, vertexIDs[i], data[i + i1].data());
+      interface.readVectorData(meshName, forcesID, vertexIDs[i], preciceDt, data[i + i1].data());
       for (size_t d = 0; d < 3; d++) {
         BOOST_TEST(expectedData[i + i1][d] == data[i + i1][d]);
       }

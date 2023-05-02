@@ -29,18 +29,20 @@ BOOST_AUTO_TEST_CASE(MultipleWriteFromMappingsAndData)
     auto dataNameTopT    = "Temperature";
     auto dataNameBottomT = "Temperature";
 
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     interface.advance(dt);
     double pressure    = -1.0;
     double temperature = -1.0;
-    interface.readScalarData(meshNameTop, dataNameTopP, vertexIDTop, pressure);
-    interface.readScalarData(meshNameTop, dataNameTopT, vertexIDTop, temperature);
+    dt                 = interface.getMaxTimeStepSize();
+    interface.readScalarData(meshNameTop, dataNameTopP, vertexIDTop, dt, pressure);
+    interface.readScalarData(meshNameTop, dataNameTopT, vertexIDTop, dt, temperature);
     BOOST_TEST(pressure == 1.0);
     BOOST_TEST(temperature == 331);
     pressure    = -1.0;
     temperature = -1.0;
-    interface.readScalarData(meshNameBottom, dataNameBottomP, vertexIDBottom, pressure);
-    interface.readScalarData(meshNameBottom, dataNameBottomT, vertexIDBottom, temperature);
+    interface.readScalarData(meshNameBottom, dataNameBottomP, vertexIDBottom, dt, pressure);
+    interface.readScalarData(meshNameBottom, dataNameBottomT, vertexIDBottom, dt, temperature);
     BOOST_TEST(temperature == 273.15);
     BOOST_TEST(pressure == 5.0);
     BOOST_TEST(not interface.isCouplingOngoing());
@@ -55,7 +57,7 @@ BOOST_AUTO_TEST_CASE(MultipleWriteFromMappingsAndData)
     auto dataNameP = "Pressure";
     auto dataNameT = "Temperature";
 
-    double dt          = interface.initialize();
+    interface.initialize();
     double pressure    = 1.0;
     double temperature = 331;
     interface.writeScalarData(meshName, dataNameP, vertexID1, pressure);
@@ -68,6 +70,7 @@ BOOST_AUTO_TEST_CASE(MultipleWriteFromMappingsAndData)
     temperature = 273.15;
     interface.writeScalarData(meshName, dataNameP, vertexID3, pressure);
     interface.writeScalarData(meshName, dataNameT, vertexID3, temperature);
+    double dt = interface.getMaxTimeStepSize();
     interface.advance(dt);
     BOOST_TEST(not interface.isCouplingOngoing());
     interface.finalize();

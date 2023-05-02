@@ -41,7 +41,8 @@ BOOST_AUTO_TEST_CASE(ParallelSquare2To1)
     interface.setMeshVertices(meshName, 3, coords.data(), vertexIDs.data());
     interface.setMeshTriangle(meshName, vertexIDs[0], vertexIDs[1], vertexIDs[2]);
 
-    dt = interface.initialize();
+    interface.initialize();
+    dt = interface.getMaxTimeStepSize();
 
     // Run a step and write data with f(x) = x+2*y
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant must advance once.");
@@ -82,7 +83,8 @@ BOOST_AUTO_TEST_CASE(ParallelSquare2To1)
     vertexIDs.resize(coords.size() / 2);
     interface.setMeshVertices(meshName, vertexIDs.size(), coords.data(), vertexIDs.data());
 
-    dt = interface.initialize();
+    interface.initialize();
+    dt = interface.getMaxTimeStepSize();
 
     // Run a step and read data expected to be f(x) = x+2*y
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant must advance once.");
@@ -95,7 +97,8 @@ BOOST_AUTO_TEST_CASE(ParallelSquare2To1)
     Eigen::VectorXd readData(4);
     expected << 7. / 6, 5. / 6, 11. / 6, 13. / 6;
 
-    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), readData.data());
+    dt = interface.getMaxTimeStepSize();
+    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), dt, readData.data());
     BOOST_CHECK(equals(expected, readData));
     interface.finalize();
   }

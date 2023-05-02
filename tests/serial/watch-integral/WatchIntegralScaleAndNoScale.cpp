@@ -33,7 +33,8 @@ BOOST_AUTO_TEST_CASE(WatchIntegralScaleAndNoScale)
     interface.setMeshEdge(meshName, idB, idC);
 
     // Initialize, the mesh
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
 
     auto   dataOneID = "DataOne";
     double valueA    = 1.0;
@@ -48,7 +49,8 @@ BOOST_AUTO_TEST_CASE(WatchIntegralScaleAndNoScale)
       interface.writeScalarData(meshName, dataOneID, idB, valueB);
       interface.writeScalarData(meshName, dataOneID, idC, valueC);
 
-      dt = interface.advance(dt);
+      interface.advance(dt);
+      double dt = interface.getMaxTimeStepSize();
 
       valueA += increment;
       valueB += increment;
@@ -74,18 +76,20 @@ BOOST_AUTO_TEST_CASE(WatchIntegralScaleAndNoScale)
     interface.setMeshEdge(meshTwoID, idB, idC);
 
     // Initialize the mesh
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
 
     auto   dataOneID = "DataOne";
     double valueA, valueB, valueC;
 
     while (interface.isCouplingOngoing()) {
 
-      interface.readScalarData(meshTwoID, dataOneID, idA, valueA);
-      interface.readScalarData(meshTwoID, dataOneID, idB, valueB);
-      interface.readScalarData(meshTwoID, dataOneID, idC, valueC);
+      interface.readScalarData(meshTwoID, dataOneID, idA, dt, valueA);
+      interface.readScalarData(meshTwoID, dataOneID, idB, dt, valueB);
+      interface.readScalarData(meshTwoID, dataOneID, idC, dt, valueC);
 
-      dt = interface.advance(dt);
+      interface.advance(dt);
+      double dt = interface.getMaxTimeStepSize();
     }
     interface.finalize();
 

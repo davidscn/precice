@@ -20,7 +20,8 @@ void testDataInitialization(precice::testing::TestContext context, std::string c
     auto   dataName   = "Data";
     double valueDataB = 0.0;
     cplInterface.initialize();
-    cplInterface.readScalarData(meshName, dataName, 0, valueDataB);
+    double dt = cplInterface.getMaxTimeStepSize();
+    cplInterface.readScalarData(meshName, dataName, 0, dt, valueDataB);
     BOOST_TEST(2.0 == valueDataB);
     cplInterface.finalize();
   } else {

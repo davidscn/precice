@@ -40,7 +40,8 @@ void testMappingVolumeOneTriangle(const std::string configFile, const TestContex
     BOOST_TEST(equals(mesh.triangles()[0].getArea(), 0.5), "Triangle area must be 0.5");
 
     // Initialize, write data, advance and finalize
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_TEST(!mesh.triangles().empty(), "Triangle must still be stored");
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant must advance once.");
 
@@ -61,7 +62,8 @@ void testMappingVolumeOneTriangle(const std::string configFile, const TestContex
     interface.setMeshVertices(meshName, vertexIDs.size(), coords.data(), vertexIDs.data());
 
     // Initialize, read data, advance and finalize. Check expected mapping
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant must advance once.");
 
     // If "read" mapping, check received mesh
@@ -81,7 +83,7 @@ void testMappingVolumeOneTriangle(const std::string configFile, const TestContex
     // Expected value in the middle of the triangle is the average of inputs (1, 10, 100)
     expected << 111.0 / 3;
 
-    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), readData.data());
+    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), dt, readData.data());
     BOOST_CHECK(equals(expected, readData));
 
     interface.finalize();
@@ -111,7 +113,8 @@ void testMappingVolumeOneTriangleConservative(const std::string configFile, cons
     BOOST_CHECK(interface.getMeshVertexSize(meshName) == 1);
 
     // Initialize, write data, advance and finalize
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant must advance once.");
 
     std::vector<double> values{1.0};
@@ -133,7 +136,8 @@ void testMappingVolumeOneTriangleConservative(const std::string configFile, cons
     interface.setMeshTriangle(meshName, vertexIDs[0], vertexIDs[1], vertexIDs[2]);
 
     // Initialize, read data, advance and finalize. Check expected mapping
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant must advance once.");
 
     interface.advance(dt);
@@ -147,7 +151,8 @@ void testMappingVolumeOneTriangleConservative(const std::string configFile, cons
     // Input point is (0.3, 0.2) and barycentric coordinates are thus (0.5, 0.3, 0.2)
     expected << 0.5, 0.3, 0.2;
 
-    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), readData.data());
+    dt = interface.getMaxTimeStepSize();
+    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), dt, readData.data());
     BOOST_CHECK(equals(expected, readData));
 
     interface.finalize();
@@ -193,7 +198,8 @@ void testMappingVolumeOneTetra(const std::string configFile, const TestContext &
     BOOST_TEST(equals(mesh.tetrahedra()[0].getVolume(), 1.0 / 6), "Tetrahedron volume must be 1/6");
 
     // Initialize, write data, advance and finalize
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_REQUIRE(mesh.edges().size() == 6);
     BOOST_REQUIRE(mesh.triangles().size() == 4);
     BOOST_REQUIRE(mesh.tetrahedra().size() == 1);
@@ -218,7 +224,8 @@ void testMappingVolumeOneTetra(const std::string configFile, const TestContext &
     interface.setMeshVertices(meshName, vertexIDs.size(), coords.data(), vertexIDs.data());
 
     // Initialize, read data, advance and finalize. Check expected mapping
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant must advance once.");
 
     // If "read" mapping, check received mesh, including connectivity
@@ -239,7 +246,8 @@ void testMappingVolumeOneTetra(const std::string configFile, const TestContext &
     // Expected value in the middle of the tetra is the average of inputs (13.0/4)
     expected << 13.0 / 4;
 
-    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), readData.data());
+    dt = interface.getMaxTimeStepSize();
+    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), dt, readData.data());
     BOOST_CHECK(equals(expected, readData));
 
     interface.finalize();
@@ -269,7 +277,8 @@ void testMappingVolumeOneTetraConservative(const std::string configFile, const T
     BOOST_CHECK(interface.getMeshVertexSize(meshName) == 1);
 
     // Initialize, write data, advance and finalize
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant must advance once.");
 
     std::vector<double> values{1.0};
@@ -305,7 +314,8 @@ void testMappingVolumeOneTetraConservative(const std::string configFile, const T
     BOOST_TEST(equals(mesh.tetrahedra()[0].getVolume(), 1.0 / 6), "Tetrahedron volume must be 1/6");
 
     // Initialize, read data, advance and finalize. Check expected mapping
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     BOOST_REQUIRE(mesh.edges().size() == 6);
     BOOST_REQUIRE(mesh.triangles().size() == 4);
     BOOST_REQUIRE(mesh.tetrahedra().size() == 1);
@@ -322,7 +332,8 @@ void testMappingVolumeOneTetraConservative(const std::string configFile, const T
     // Input point is (0.1, 0.2, 0.3) and barycentric coordinates are thus (0.4, 0.1, 0.2, 0.3)
     expected << 0.4, 0.1, 0.2, 0.3;
 
-    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), readData.data());
+    dt = interface.getMaxTimeStepSize();
+    interface.readBlockScalarData(meshName, dataName, expected.size(), vertexIDs.data(), dt, readData.data());
     BOOST_CHECK(equals(expected, readData));
 
     interface.finalize();

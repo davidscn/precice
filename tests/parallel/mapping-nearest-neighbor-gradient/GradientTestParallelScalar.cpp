@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(GradientTestParallelScalar)
     BOOST_TEST(interface.requiresGradientDataFor(meshName, dataName) == false);
     Eigen::Vector2d values;
     interface.advance(1.0);
-    interface.readBlockScalarData(meshName, dataName, 2, vertexIDs, values.data());
+    interface.readBlockScalarData(meshName, dataName, 2, vertexIDs, interface.getMaxTimeStepSize(), values.data());
     Eigen::Vector2d expected(context.rank * 2.0 + 1.0 + 0.05, 2.0 * (context.rank + 1) + 0.05);
     BOOST_TEST(values == expected);
     interface.finalize();

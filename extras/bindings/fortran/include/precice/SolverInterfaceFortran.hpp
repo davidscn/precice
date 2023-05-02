@@ -1,6 +1,6 @@
 #pragma once
 
-#include "precice/export.h"
+#include <precice/export.h>
 
 /** @file
  * This file contains a Fortran 77 compatible interface written in C/C++.
@@ -39,27 +39,27 @@ PRECICE_API void precicef_create_(
 
 /**
  * Fortran syntax:
- * precicef_initialize( DOUBLE PRECISION timstepLengthLimit )
+ * precicef_initialize()
  *
  * IN:  -
- * OUT: timestepLengthLimit
+ * OUT: -
  *
  * @copydoc precice::SolverInterface::initialize()
  *
  */
-PRECICE_API void precicef_initialize_(double *timestepLengthLimit);
+PRECICE_API void precicef_initialize_();
 
 /**
  * Fortran syntax:
- * precicef_advance( DOUBLE PRECISION timstepLengthLimit )
+ * precicef_advance( DOUBLE PRECISION timeStepSize )
  *
- * IN:  timestepLengthLimit
- * OUT: timestepLengthLimit
+ * IN:  timeStepSize
+ * OUT: -
  *
  * @copydoc precice::SolverInterface::advance()
  *
  */
-PRECICE_API void precicef_advance_(double *timestepLengthLimit);
+PRECICE_API void precicef_advance_(const double *timeStepSize);
 
 /**
  * Fortran syntax:
@@ -72,15 +72,40 @@ PRECICE_API void precicef_finalize_();
 
 /**
  * Fortran syntax:
- * precicef_get_dims( INTEGER dimensions )
+ * precicef_get_mesh_dimensions_(
+ *   CHARACTER meshName(*),
+ *   INTEGER   dimensions)
  *
- * IN:  -
+ * IN:  mesh, meshNameLength
  * OUT: dimensions
  *
- * @copydoc precice::SolverInterface::getDimensions()
+ * @copydoc precice::SolverInterface::getMeshDimensions()
  *
  */
-PRECICE_API void precicef_get_dims_(int *dimensions);
+PRECICE_API void precicef_get_mesh_dimensions_(
+    const char *meshName,
+    int *       dimensions,
+    int         meshNameLength);
+
+/**
+ * Fortran syntax:
+ * precicef_get_data_dimensions_(
+ *   CHARACTER meshName(*),
+ *   CHARACTER dataName(*),
+ *   INTEGER   dimensions)
+ *
+ * IN:  mesh, data, meshNameLength, dataNameLength
+ * OUT: dimensions
+ *
+ * @copydoc precice::SolverInterface::getDataDimensions()
+ *
+ */
+PRECICE_API void precicef_get_data_dimensions_(
+    const char *meshName,
+    const char *dataName,
+    int *       dimensions,
+    int         meshNameLength,
+    int         dataNameLength);
 
 /**
  * Fortran syntax:
@@ -105,6 +130,18 @@ PRECICE_API void precicef_is_coupling_ongoing_(int *isOngoing);
  *
  */
 PRECICE_API void precicef_is_time_window_complete_(int *isComplete);
+
+/**
+ * Fortran syntax:
+ * precicef_get_max_time_step_size( DOUBLE PRECISION maxTimeStepSize )
+ *
+ * IN:  -
+ * OUT: maxTimeStepSize
+ *
+ * @copydoc precice::SolverInterface::getMaxTimeStepSize()
+ *
+ */
+PRECICE_API void precicef_get_max_time_step_size_(double *maxTimeStepSize);
 
 /**
  * Fortran syntax:
@@ -516,6 +553,7 @@ PRECICE_API void precicef_write_sdata_(
  *   CHARACTER dataName(*),
  *   INTEGER size,
  *   INTEGER valueIndices,
+ *   DOUBLE PRECISION relativeReadTime,
  *   DOUBLE PRECISION values(dim*size) )
  *
  * IN:  mesh, data, size, valueIndices, meshNameLength, dataNameLength
@@ -525,13 +563,14 @@ PRECICE_API void precicef_write_sdata_(
  *
  */
 PRECICE_API void precicef_read_bvdata_(
-    const char *meshName,
-    const char *dataName,
-    const int * size,
-    int *       valueIndices,
-    double *    values,
-    int         meshNameLength,
-    int         dataNameLength);
+    const char *  meshName,
+    const char *  dataName,
+    const int *   size,
+    int *         valueIndices,
+    const double *relativeReadTime,
+    double *      values,
+    int           meshNameLength,
+    int           dataNameLength);
 
 /**
  * Fortran syntax:
@@ -539,6 +578,7 @@ PRECICE_API void precicef_read_bvdata_(
  *   CHARACTER meshName(*),
  *   CHARACTER dataName(*),
  *   INTEGER valueIndex,
+ *   DOUBLE PRECISION relativeReadTime,
  *   DOUBLE PRECISION dataValue(dim) )
  *
  * IN:  mesh, data, valueIndex, meshNameLength, dataNameLength
@@ -548,12 +588,13 @@ PRECICE_API void precicef_read_bvdata_(
  *
  */
 PRECICE_API void precicef_read_vdata_(
-    const char *meshName,
-    const char *dataName,
-    const int * valueIndex,
-    double *    dataValue,
-    int         meshNameLength,
-    int         dataNameLength);
+    const char *  meshName,
+    const char *  dataName,
+    const int *   valueIndex,
+    const double *relativeReadTime,
+    double *      dataValue,
+    int           meshNameLength,
+    int           dataNameLength);
 
 /**
  * Fortran syntax:
@@ -562,6 +603,7 @@ PRECICE_API void precicef_read_vdata_(
  *   CHARACTER dataName(*),
  *   INTEGER size,
  *   INTEGER valueIndices,
+ *   DOUBLE PRECISION relativeReadTime,
  *   DOUBLE PRECISION values(size) )
  *
  * IN:  mesh, data, size, valueIndices, meshNameLength, dataNameLength
@@ -571,13 +613,14 @@ PRECICE_API void precicef_read_vdata_(
  *
  */
 PRECICE_API void precicef_read_bsdata_(
-    const char *meshName,
-    const char *dataName,
-    const int * size,
-    int *       valueIndices,
-    double *    values,
-    int         meshNameLength,
-    int         dataNameLength);
+    const char *  meshName,
+    const char *  dataName,
+    const int *   size,
+    int *         valueIndices,
+    const double *relativeReadTime,
+    double *      values,
+    int           meshNameLength,
+    int           dataNameLength);
 
 /**
  * Fortran syntax:
@@ -585,6 +628,7 @@ PRECICE_API void precicef_read_bsdata_(
  *   CHARACTER meshName(*),
  *   CHARACTER dataName(*),
  *   INTEGER valueIndex,
+ *   DOUBLE PRECISION relativeReadTime,
  *   DOUBLE PRECISION dataValue )
  *
  * IN:  mesh, data, valueIndex, meshNameLength, dataNameLength
@@ -594,12 +638,13 @@ PRECICE_API void precicef_read_bsdata_(
  *
  */
 PRECICE_API void precicef_read_sdata_(
-    const char *meshName,
-    const char *dataName,
-    const int * valueIndex,
-    double *    dataValue,
-    int         meshNameLength,
-    int         dataNameLength);
+    const char *  meshName,
+    const char *  dataName,
+    const int *   valueIndex,
+    const double *relativeReadTime,
+    double *      dataValue,
+    int           meshNameLength,
+    int           dataNameLength);
 
 PRECICE_API void precicef_get_version_information_(
     char *versionInfo,
@@ -734,7 +779,7 @@ PRECICE_API void precicef_set_mesh_access_region_(
 
 /**
  * Fortran syntax:
- * precicef_get_mesh_vertices_and_IDs_(
+ * precicef_get_mesh_vertices_and_ids_(
  *   CHARACTER        meshName(*),
  *   INTEGER          size,
  *   INTEGER          ids(size),
@@ -745,7 +790,7 @@ PRECICE_API void precicef_set_mesh_access_region_(
  *
  * @copydoc precice::SolverInterface::getMeshVerticesAndIDs()
  */
-PRECICE_API void precicef_get_mesh_vertices_and_IDs_(
+PRECICE_API void precicef_get_mesh_vertices_and_ids_(
     const char *meshName,
     const int   size,
     int *       ids,

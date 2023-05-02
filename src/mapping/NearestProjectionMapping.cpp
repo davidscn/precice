@@ -105,4 +105,9 @@ void NearestProjectionMapping::computeMapping()
   _hasComputedMapping = true;
 }
 
+std::string NearestProjectionMapping::getName() const
+{
+  return "nearest-projection";
+}
+
 } // namespace precice::mapping

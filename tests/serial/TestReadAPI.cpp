@@ -1,4 +1,3 @@
-#include <boost/test/tools/old/interface.hpp>
 #ifndef PRECICE_NO_MPI
 
 #include "testing/Testing.hpp"
@@ -38,10 +37,11 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     writeDataA[2] = 7.0;
     cplInterface.writeVectorData(meshName, dataAID, vertexIDs[0], writeDataA.data());
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
 
     // readBlockScalarData without waveform
-    cplInterface.readBlockScalarData(meshName, dataBID, 1, vertexIDs.data(), readDataB.data());
+    cplInterface.readBlockScalarData(meshName, dataBID, 1, vertexIDs.data(), maxDt, readDataB.data());
     // expected data value received
     BOOST_TEST(3.0 == readDataB[0]);
     // reset value at read destination
@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     readDataB[0] = 0;
 
     // readScalarData without waveform
-    cplInterface.readScalarData(meshName, dataBID, vertexIDs[0], readDataB[0]);
+    cplInterface.readScalarData(meshName, dataBID, vertexIDs[0], maxDt, readDataB[0]);
     // expected data value received
     BOOST_TEST(3.0 == readDataB[0]);
     // reset value at read destination
@@ -78,12 +78,13 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
       writeDataA[2] = 14.0;
       cplInterface.writeVectorData(meshName, dataAID, vertexIDs[0], writeDataA.data());
 
-      maxDt = cplInterface.advance(maxDt);
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.isCouplingOngoing()) {
 
         // readBlockScalarData without waveform
-        cplInterface.readBlockScalarData(meshName, dataBID, 1, vertexIDs.data(), readDataB.data());
+        cplInterface.readBlockScalarData(meshName, dataBID, 1, vertexIDs.data(), maxDt, readDataB.data());
         // expected data value received
         BOOST_TEST(6.0 == readDataB[0]);
         // reset value at read destination
@@ -96,7 +97,7 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
         readDataB[0] = 0;
 
         // readScalarData without waveform
-        cplInterface.readScalarData(meshName, dataBID, vertexIDs[0], readDataB[0]);
+        cplInterface.readScalarData(meshName, dataBID, vertexIDs[0], maxDt, readDataB[0]);
         // expected data value received
         BOOST_TEST(6.0 == readDataB[0]);
         // reset value at read destination
@@ -129,10 +130,11 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     writeDataB[0] = 3.0;
     cplInterface.writeScalarData(meshName, dataBID, vertexIDs[0], writeDataB[0]);
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
 
     // readBlockVectorData without waveform
-    cplInterface.readBlockVectorData(meshName, dataAID, 1, vertexIDs.data(), readDataA.data());
+    cplInterface.readBlockVectorData(meshName, dataAID, 1, vertexIDs.data(), maxDt, readDataA.data());
     // expected data value received
     BOOST_TEST(Vector3d(7.0, 7.0, 7.0) == readDataA);
     // reset value at read destination
@@ -149,7 +151,7 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
     readDataA[2] = 0;
 
     // readVectorData without waveform
-    cplInterface.readVectorData(meshName, dataAID, vertexIDs[0], readDataA.data());
+    cplInterface.readVectorData(meshName, dataAID, vertexIDs[0], maxDt, readDataA.data());
     // expected data value received
     BOOST_TEST(Vector3d(7.0, 7.0, 7.0) == readDataA);
     // reset value at read destination
@@ -175,11 +177,12 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
       writeDataB[0] = 6.0;
       cplInterface.writeScalarData(meshName, dataBID, vertexIDs[0], writeDataB[0]);
 
-      maxDt = cplInterface.advance(maxDt);
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.isCouplingOngoing()) {
         // readBlockVectorData without waveform
-        cplInterface.readBlockVectorData(meshName, dataAID, 1, vertexIDs.data(), readDataA.data());
+        cplInterface.readBlockVectorData(meshName, dataAID, 1, vertexIDs.data(), maxDt, readDataA.data());
         // expected data value received
         BOOST_TEST(Vector3d(14.0, 14.0, 14.0) == readDataA);
         // reset value at read destination
@@ -196,7 +199,7 @@ BOOST_AUTO_TEST_CASE(TestReadAPI)
         readDataA[2] = 0;
 
         // readVectorData without waveform
-        cplInterface.readVectorData(meshName, dataAID, vertexIDs[0], readDataA.data());
+        cplInterface.readVectorData(meshName, dataAID, vertexIDs[0], maxDt, readDataA.data());
         // expected data value received
         BOOST_TEST(Vector3d(14.0, 14.0, 14.0) == readDataA);
         // reset value at read destination

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "precice/Version.h"
-#include "precice/export.h"
+#include <precice/Version.h>
+#include <precice/export.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,18 +60,15 @@ PRECICE_API void precicec_createSolverInterface(
 
 /**
  * @brief Initiates the coupling to the coupling supervisor and initializes coupling data.
- *
- * @return Maximal length of first timestep to be computed by solver.
  */
-PRECICE_API double precicec_initialize();
+PRECICE_API void precicec_initialize();
 
 /**
  * @brief Exchanges data between solver and coupling supervisor.
  *
- * @param[in] computedTimestepLength Length of timestep computed by solver.
- * @return Maximal length of next timestep to be computed by solver.
+ * @param[in] computedTimeStepSize Size of time step computed by solver.
  */
-PRECICE_API double precicec_advance(double computedTimestepLength);
+PRECICE_API void precicec_advance(double computedTimeStepSize);
 
 /**
  * @brief Finalizes the coupling to the coupling supervisor.
@@ -83,10 +80,11 @@ PRECICE_API void precicec_finalize();
 ///@name Status Queries
 ///@{
 
-/**
- * @brief Returns the number of spatial configurations for the coupling.
- */
-PRECICE_API int precicec_getDimensions();
+/// @copydoc precice::SolverInterface::getMeshDimensions()
+PRECICE_API int precicec_getMeshDimensions(const char *meshName);
+
+/// @copydoc precice::SolverInterface::getDataDimensions()
+PRECICE_API int precicec_getDataDimensions(const char *meshName, const char *dataName);
 
 /**
  * @brief Returns true (->1), if the coupled simulation is ongoing
@@ -97,6 +95,11 @@ PRECICE_API int precicec_isCouplingOngoing();
  * @brief Returns true (->1), if the coupling time window is completed.
  */
 PRECICE_API int precicec_isTimeWindowComplete();
+
+/**
+ * @brief Returns maximum allowed time step size
+ */
+PRECICE_API double precicec_getMaxTimeStepSize();
 
 ///@}
 
@@ -352,6 +355,7 @@ PRECICE_API void precicec_writeScalarData(
  * @param[in] dataName the name of the data to be read.
  * @param[in] size  Number of indices, and number of values * dimensions.
  * @param[in] valueIndices Indices (from setReadPosition()) of data values.
+ * @param[in] relativeReadTime Point in time where data is read relative to the beginning of the current time step.
  * @param[in] values Values of the data to be read.
  */
 PRECICE_API void precicec_readBlockVectorData(
@@ -359,6 +363,7 @@ PRECICE_API void precicec_readBlockVectorData(
     const char *dataName,
     int         size,
     const int * valueIndices,
+    double      relativeReadTime,
     double *    values);
 
 /**
@@ -367,12 +372,14 @@ PRECICE_API void precicec_readBlockVectorData(
  * @param[in] meshName the name of the mesh
  * @param[in] dataName the name of the data to be read.
  * @param[in] dataNamePosition Position where the read data should be mapped to.
+ * @param[in] relativeReadTime Point in time where data is read relative to the beginning of the current time step.
  * @param[out] dataValue Vectorial data value read.
  */
 PRECICE_API void precicec_readVectorData(
     const char *meshName,
     const char *dataName,
     int         valueIndex,
+    double      relativeReadTime,
     double *    dataValue);
 
 /**
@@ -383,6 +390,7 @@ PRECICE_API void precicec_readBlockScalarData(
     const char *dataName,
     int         size,
     const int * valueIndices,
+    double      relativeReadTime,
     double *    values);
 
 /**
@@ -391,12 +399,14 @@ PRECICE_API void precicec_readBlockScalarData(
  * @param[in] meshName the name of the mesh
  * @param[in] dataName the name of the data to be read.
  * @param[in] dataNamePosition Position where the read data should be mapped to.
+ * @param[in] relativeReadTime Point in time where data is read relative to the beginning of the current time step.
  * @param[out] dataValue Scalar data value read.
  */
 PRECICE_API void precicec_readScalarData(
     const char *meshName,
     const char *dataName,
     int         valueIndex,
+    double      relativeReadTime,
     double *    dataValue);
 
 /**

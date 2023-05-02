@@ -55,8 +55,9 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
 
     Vector3d valueDataB;
 
-    double maxDt = cplInterface.initialize();
-    cplInterface.readVectorData(meshName, dataBID, 0, valueDataB.data());
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
+    cplInterface.readVectorData(meshName, dataBID, 0, maxDt, valueDataB.data());
     Vector3d expected(2.0, 3.0, 4.0);
     BOOST_TEST(valueDataB == expected);
 
@@ -67,9 +68,10 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
       cplInterface.writeVectorData(meshName, dataAID, 0, valueDataA.data());
       cplInterface.writeVectorGradientData(meshName, dataAID, 0, gradient.data());
 
-      maxDt = cplInterface.advance(maxDt);
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
-      cplInterface.readVectorData(meshName, dataBID, 0, valueDataB.data());
+      cplInterface.readVectorData(meshName, dataBID, 0, maxDt, valueDataB.data());
       expected << 2.5, 3.5, 4.5;
       BOOST_TEST(valueDataB == expected);
     }
@@ -89,10 +91,11 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
     cplInterface.writeVectorData(meshName, dataBID, 0, valueDataB.data());
 
     //tell preCICE that data has been written and call initialize
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
 
     Vector3d valueDataA;
-    cplInterface.readVectorData(meshName, dataAID, 0, valueDataA.data());
+    cplInterface.readVectorData(meshName, dataAID, 0, maxDt, valueDataA.data());
     Vector3d expected(4.0, 4.0, 4.0);
     BOOST_TEST(valueDataA == expected);
 
@@ -101,8 +104,9 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadVector)
       valueDataB << 2.5, 3.5, 4.5;
       cplInterface.writeVectorData(meshName, dataBID, 0, valueDataB.data());
 
-      maxDt = cplInterface.advance(maxDt);
-      cplInterface.readVectorData(meshName, dataAID, 0, valueDataA.data());
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
+      cplInterface.readVectorData(meshName, dataAID, 0, maxDt, valueDataA.data());
       BOOST_TEST(valueDataA == expected);
     }
     cplInterface.finalize();

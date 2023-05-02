@@ -55,16 +55,18 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalWriteScalar)
     auto dataBID = "DataTwo";
 
     double valueDataB = 0.0;
-    double maxDt      = cplInterface.initialize();
-    cplInterface.readScalarData(meshName, dataBID, 0, valueDataB);
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
+    cplInterface.readScalarData(meshName, dataBID, 0, maxDt, valueDataB);
     BOOST_TEST(1.3 == valueDataB);
 
     while (cplInterface.isCouplingOngoing()) {
       Vector3d valueDataA(1.0, 1.0, 1.0);
       cplInterface.writeVectorData(meshName, dataAID, 0, valueDataA.data());
-      maxDt = cplInterface.advance(maxDt);
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
-      cplInterface.readScalarData(meshName, dataBID, 0, valueDataB);
+      cplInterface.readScalarData(meshName, dataBID, 0, maxDt, valueDataB);
       BOOST_TEST(1.8 == valueDataB);
     }
     cplInterface.finalize();
@@ -85,10 +87,11 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalWriteScalar)
     cplInterface.writeScalarGradientData(meshName, dataBID, 0, valueGradDataB.data());
 
     //tell preCICE that data has been written and call initialize
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
 
     Vector3d valueDataA;
-    cplInterface.readVectorData(meshName, dataAID, 0, valueDataA.data());
+    cplInterface.readVectorData(meshName, dataAID, 0, maxDt, valueDataA.data());
     Vector3d expected(1.0, 1.0, 1.0);
     BOOST_TEST(valueDataA == expected);
 
@@ -97,8 +100,9 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalWriteScalar)
       Vector3d valueGradDataA(1.0, 1.0, 1.0);
       cplInterface.writeScalarGradientData(meshName, dataBID, 0, valueGradDataA.data());
 
-      maxDt = cplInterface.advance(maxDt);
-      cplInterface.readVectorData(meshName, dataAID, 0, valueDataA.data());
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
+      cplInterface.readVectorData(meshName, dataAID, 0, maxDt, valueDataA.data());
       BOOST_TEST(valueDataA == expected);
     }
     cplInterface.finalize();

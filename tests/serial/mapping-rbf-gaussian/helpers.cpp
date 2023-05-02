@@ -61,7 +61,8 @@ void testRBFMapping(const std::string configFile, const TestContext &context)
     ids.emplace_back(interface.setMeshVertex(meshOneID, coordOneL.data()));
 
     // Initialize, thus sending the mesh.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Sending participant should have to advance once!");
     // Write the data to be send.
     auto dataAID = "DataOne";
@@ -85,7 +86,8 @@ void testRBFMapping(const std::string configFile, const TestContext &context)
     int idC = interface.setMeshVertex(meshTwoID, coordTwoC.data());
 
     // Initialize, thus receive the data and map.
-    double maxDt = interface.initialize();
+    interface.initialize();
+    double maxDt = interface.getMaxTimeStepSize();
     BOOST_TEST(interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
 
     // Read the mapped data from the mesh.
@@ -93,9 +95,9 @@ void testRBFMapping(const std::string configFile, const TestContext &context)
     BOOST_TEST(!interface.requiresGradientDataFor(meshTwoID, dataAID));
 
     double valueA, valueB, valueC;
-    interface.readScalarData(meshTwoID, dataAID, idA, valueA);
-    interface.readScalarData(meshTwoID, dataAID, idB, valueB);
-    interface.readScalarData(meshTwoID, dataAID, idC, valueC);
+    interface.readScalarData(meshTwoID, dataAID, idA, maxDt, valueA);
+    interface.readScalarData(meshTwoID, dataAID, idB, maxDt, valueB);
+    interface.readScalarData(meshTwoID, dataAID, idC, maxDt, valueC);
 
     // Due to Eigen 3.3.7 (Ubunu 2004) giving slightly different results
     BOOST_TEST(valueA == expectedValTwoA, boost::test_tools::tolerance(1e-8));

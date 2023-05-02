@@ -25,11 +25,12 @@ BOOST_AUTO_TEST_CASE(MultipleReadToMappings)
     auto dataNameTop    = "DisplacementTop";
     auto dataNameBottom = "DisplacementBottom";
 
-    double dt              = interface.initialize();
+    interface.initialize();
     double displacementTop = 1.0;
     interface.writeScalarData(meshNameTop, dataNameTop, vertexIDTop, displacementTop);
     double displacementBottom = 2.0;
     interface.writeScalarData(meshNameBottom, dataNameBottom, vertexIDBottom, displacementBottom);
+    double dt = interface.getMaxTimeStepSize();
     interface.advance(dt);
     BOOST_TEST(not interface.isCouplingOngoing());
     interface.finalize();
@@ -41,13 +42,15 @@ BOOST_AUTO_TEST_CASE(MultipleReadToMappings)
     auto bottomID = "DisplacementBottom";
     auto topID    = "DisplacementTop";
 
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
     interface.advance(dt);
+    dt                        = interface.getMaxTimeStepSize();
     double displacementTop    = -1.0;
     double displacementBottom = -3.0;
-    interface.readScalarData(meshName, topID, vertexID, displacementTop);
+    interface.readScalarData(meshName, topID, vertexID, dt, displacementTop);
     BOOST_TEST(displacementTop == 1.0);
-    interface.readScalarData(meshName, bottomID, vertexID, displacementBottom);
+    interface.readScalarData(meshName, bottomID, vertexID, dt, displacementBottom);
     BOOST_TEST(displacementBottom == 2.0);
     BOOST_TEST(not interface.isCouplingOngoing());
     interface.finalize();

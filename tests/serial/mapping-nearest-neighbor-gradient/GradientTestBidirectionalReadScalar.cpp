@@ -52,8 +52,9 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadScalar)
     auto dataBID = "DataTwo";
 
     double valueDataB = 0.0;
-    double maxDt      = cplInterface.initialize();
-    cplInterface.readScalarData(meshName, dataBID, 0, valueDataB);
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
+    cplInterface.readScalarData(meshName, dataBID, 0, maxDt, valueDataB);
     BOOST_TEST(valueDataB == 1.0);
 
     while (cplInterface.isCouplingOngoing()) {
@@ -63,9 +64,10 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadScalar)
       BOOST_TEST(cplInterface.requiresGradientDataFor(meshName, dataAID));
       cplInterface.writeScalarGradientData(meshName, dataAID, 0, valueGradDataA.data());
 
-      maxDt = cplInterface.advance(maxDt);
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
-      cplInterface.readScalarData(meshName, dataBID, 0, valueDataB);
+      cplInterface.readScalarData(meshName, dataBID, 0, maxDt, valueDataB);
       BOOST_TEST(valueDataB == 1.5);
     }
     cplInterface.finalize();
@@ -85,15 +87,17 @@ BOOST_AUTO_TEST_CASE(GradientTestBidirectionalReadScalar)
     cplInterface.writeScalarData(meshName, dataBID, 0, valueDataB);
 
     //tell preCICE that data has been written and call initialize
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
 
     while (cplInterface.isCouplingOngoing()) {
       cplInterface.writeScalarData(meshName, dataBID, 0, 1.5);
 
-      maxDt = cplInterface.advance(maxDt);
+      cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       double valueDataA;
-      cplInterface.readScalarData(meshName, dataAID, 0, valueDataA);
+      cplInterface.readScalarData(meshName, dataAID, 0, maxDt, valueDataA);
       BOOST_TEST(valueDataA == 2.4);
     }
     cplInterface.finalize();

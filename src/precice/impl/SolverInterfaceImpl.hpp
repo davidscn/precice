@@ -58,7 +58,7 @@ public:
   ///@{
 
   /**
-   * @copydoc SolverInterface::SolverInterface(const std::string&, const std::string&, int, int)
+   * @copydoc SolverInterface::SolverInterface(std::string_view, std::string_view, int, int)
    */
   SolverInterfaceImpl(
       std::string_view participantName,
@@ -67,12 +67,12 @@ public:
       int              solverProcessSize);
 
   /**
-   * @copybrief SolverInterface::SolverInterface(const std::string&, const std::string&, int, int, void*)
+   * @copybrief SolverInterface::SolverInterface(std::string_view, std::string_view, int, int, void*)
    *
    * Use the parameter communicator to specify a custom global MPI communicator.
    * Pass a null pointer to signal preCICE to use MPI_COMM_WORLD.
    *
-   * @copydetails SolverInterface::SolverInterface(const std::string&, const std::string&, int, int, void*)
+   * @copydetails SolverInterface::SolverInterface(std::string_view, std::string_view, int, int, void*)
    */
   SolverInterfaceImpl(
       std::string_view participantName,
@@ -96,10 +96,10 @@ public:
   ///@{
 
   /// @copydoc SolverInterface::initialize
-  double initialize();
+  void initialize();
 
   /// @copydoc SolverInterface::advance
-  double advance(double computedTimestepLength);
+  void advance(double computedTimeStepSize);
 
   /// @copydoc SolverInterface::finalize
   void finalize();
@@ -109,14 +109,20 @@ public:
   ///@name Status Queries
   ///@{
 
-  /// @copydoc SolverInterface::getDimensions
-  int getDimensions() const;
+  /// @copydoc SolverInterface::getMeshDimensions
+  int getMeshDimensions(std::string_view meshName) const;
+
+  /// @copydoc SolverInterface::getDataDimensions
+  int getDataDimensions(std::string_view meshName, std::string_view dataName) const;
 
   /// @copydoc SolverInterface::isCouplingOngoing
   bool isCouplingOngoing() const;
 
   /// @copydoc SolverInterface::isTimeWindowComplete
   bool isTimeWindowComplete() const;
+
+  /// @copydoc SolverInterface::getMaxTimeStepSize
+  double getMaxTimeStepSize() const;
 
   ///@}
 
@@ -237,7 +243,7 @@ public:
       const int *      valueIndices,
       const double *   values);
 
-  /// @copydoc precice::SolverInterface::writeBlockVectorGradientData
+  /// @copydoc SolverInterface::writeBlockVectorGradientData
   void writeBlockVectorGradientData(
       std::string_view meshName,
       std::string_view dataName,
@@ -252,7 +258,7 @@ public:
       int              valueIndex,
       const double *   value);
 
-  /// @copydoc precice::SolverInterface::writeVectorGradientData
+  /// @copydoc SolverInterface::writeVectorGradientData
   void writeVectorGradientData(
       std::string_view meshName,
       std::string_view dataName,
@@ -267,7 +273,7 @@ public:
       const int *      valueIndices,
       const double *   values);
 
-  /// @copydoc precice::SolverInterface::writeBlockScalarGradientData
+  /// @copydoc SolverInterface::writeBlockScalarGradientData
   void writeBlockScalarGradientData(
       std::string_view meshName,
       std::string_view dataName,
@@ -282,22 +288,14 @@ public:
       int              valueIndex,
       double           value);
 
-  /// @copydoc precice::SolverInterface::writeScalarGradientData
+  /// @copydoc SolverInterface::writeScalarGradientData
   void writeScalarGradientData(
       std::string_view meshName,
       std::string_view dataName,
       int              valueIndex,
       const double *   gradientValues);
 
-  /// @copydoc SolverInterface::readBlockVectorData(int, int, const int*, double*) const
-  void readBlockVectorData(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              size,
-      const int *      valueIndices,
-      double *         values) const;
-
-  /// @copydoc SolverInterface::readBlockVectorData(int, int, const int*, double, double*) const
+  /// @copydoc SolverInterface::readBlockVectorData
   void readBlockVectorData(
       std::string_view meshName,
       std::string_view dataName,
@@ -306,14 +304,7 @@ public:
       double           relativeReadTime,
       double *         values) const;
 
-  /// @copydoc SolverInterface::readVectorData(int, int, double*) const
-  void readVectorData(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              valueIndex,
-      double *         value) const;
-
-  /// @copydoc SolverInterface::readVectorData(int, int, double, double*) const
+  /// @copydoc SolverInterface::readVectorData
   void readVectorData(
       std::string_view meshName,
       std::string_view dataName,
@@ -321,15 +312,7 @@ public:
       double           relativeReadTime,
       double *         value) const;
 
-  /// @copydoc SolverInterface::readBlockScalarData(int, int, const int*, double*) const
-  void readBlockScalarData(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              size,
-      const int *      valueIndices,
-      double *         values) const;
-
-  /// @copydoc SolverInterface::readBlockScalarData(int, int, const int*, double, double*) const
+  /// @copydoc SolverInterface::readBlockScalarData
   void readBlockScalarData(
       std::string_view meshName,
       std::string_view dataName,
@@ -338,14 +321,7 @@ public:
       double           relativeReadTime,
       double *         values) const;
 
-  /// @copydoc SolverInterface::readScalarData(int, int, double&) const
-  void readScalarData(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              valueIndex,
-      double &         value) const;
-
-  /// @copydoc SolverInterface::readScalarData(int, int, double, double&) const
+  /// @copydoc SolverInterface::readScalarData
   void readScalarData(
       std::string_view meshName,
       std::string_view dataName,
@@ -480,37 +456,6 @@ private:
 
   void configureM2Ns(const m2n::M2NConfiguration::SharedPointer &config);
 
-  /// Implementation of read functions.
-  void readBlockVectorDataImpl(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              size,
-      const int *      valueIndices,
-      double           relativeReadTime,
-      double *         values) const;
-
-  void readVectorDataImpl(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              valueIndex,
-      double           relativeReadTime,
-      double *         value) const;
-
-  void readBlockScalarDataImpl(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              size,
-      const int *      valueIndices,
-      double           relativeReadTime,
-      double *         values) const;
-
-  void readScalarDataImpl(
-      std::string_view meshName,
-      std::string_view dataName,
-      int              valueIndex,
-      double           relativeReadTime,
-      double &         value) const;
-
   /// Exports meshes with data and watch point data.
   void handleExports();
 
@@ -556,8 +501,8 @@ private:
   /// Advances the coupling schemes
   void advanceCouplingScheme();
 
-  /// Syncs the timestep between all ranks (all timesteps should be the same!)
-  void syncTimestep(double computedTimestepLength);
+  /// Syncs the time step size between all ranks (all time steps sizes should be the same!)
+  void syncTimestep(double computedTimeStepSize);
 
   /// Which channels to close in closeCommunicationChannels()
   enum class CloseChannels : bool {

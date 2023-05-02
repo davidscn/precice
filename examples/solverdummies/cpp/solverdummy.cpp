@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     meshName      = "SolverTwo-Mesh";
   }
 
-  int dimensions       = interface.getDimensions();
+  int dimensions       = interface.getMeshDimensions(meshName);
   int numberOfVertices = 3;
 
   std::vector<double> readData(numberOfVertices * dimensions);
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     std::cout << "DUMMY: Writing initial data\n";
   }
 
-  double dt = interface.initialize();
+  interface.initialize();
 
   while (interface.isCouplingOngoing()) {
 
@@ -69,7 +69,8 @@ int main(int argc, char **argv)
       std::cout << "DUMMY: Writing iteration checkpoint\n";
     }
 
-    interface.readBlockVectorData(meshName, dataReadName, numberOfVertices, vertexIDs.data(), readData.data());
+    double dt = interface.getMaxTimeStepSize();
+    interface.readBlockVectorData(meshName, dataReadName, numberOfVertices, vertexIDs.data(), dt, readData.data());
 
     for (int i = 0; i < numberOfVertices * dimensions; i++) {
       writeData.at(i) = readData.at(i) + 1;
@@ -77,7 +78,7 @@ int main(int argc, char **argv)
 
     interface.writeBlockVectorData(meshName, dataWriteName, numberOfVertices, vertexIDs.data(), writeData.data());
 
-    dt = interface.advance(dt);
+    interface.advance(dt);
 
     if (interface.requiresReadingCheckpoint()) {
       std::cout << "DUMMY: Reading iteration checkpoint\n";

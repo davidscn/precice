@@ -37,7 +37,8 @@ BOOST_AUTO_TEST_CASE(SummationActionTwoSources)
     int idD = interface.setMeshVertex(meshName, coordD.data());
 
     // Initialize, the mesh
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
 
     // Read the summed data from the mesh.
     auto   dataAID = "Target";
@@ -45,17 +46,18 @@ BOOST_AUTO_TEST_CASE(SummationActionTwoSources)
 
     while (interface.isCouplingOngoing()) {
 
-      interface.readScalarData(meshName, dataAID, idA, valueA);
-      interface.readScalarData(meshName, dataAID, idB, valueB);
-      interface.readScalarData(meshName, dataAID, idC, valueC);
-      interface.readScalarData(meshName, dataAID, idD, valueD);
+      interface.readScalarData(meshName, dataAID, idA, dt, valueA);
+      interface.readScalarData(meshName, dataAID, idB, dt, valueB);
+      interface.readScalarData(meshName, dataAID, idC, dt, valueC);
+      interface.readScalarData(meshName, dataAID, idD, dt, valueD);
 
       BOOST_TEST(valueA == expectedValueA);
       BOOST_TEST(valueB == expectedValueB);
       BOOST_TEST(valueC == expectedValueC);
       BOOST_TEST(valueD == expectedValueD);
 
-      dt = interface.advance(dt);
+      interface.advance(dt);
+      double dt = interface.getMaxTimeStepSize();
     }
 
     interface.finalize();
@@ -77,7 +79,8 @@ BOOST_AUTO_TEST_CASE(SummationActionTwoSources)
     int idD = interface.setMeshVertex(meshName, coordD.data());
 
     // Initialize, the mesh
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
 
     auto   dataAID = "SourceOne";
     double valueA  = 1.0;
@@ -92,7 +95,8 @@ BOOST_AUTO_TEST_CASE(SummationActionTwoSources)
       interface.writeScalarData(meshName, dataAID, idC, valueC);
       interface.writeScalarData(meshName, dataAID, idD, valueD);
 
-      dt = interface.advance(dt);
+      interface.advance(dt);
+      double dt = interface.getMaxTimeStepSize();
     }
     interface.finalize();
   } else {
@@ -114,7 +118,8 @@ BOOST_AUTO_TEST_CASE(SummationActionTwoSources)
     int idD = interface.setMeshVertex(meshName, coordD.data());
 
     // Initialize, the mesh
-    double dt = interface.initialize();
+    interface.initialize();
+    double dt = interface.getMaxTimeStepSize();
 
     auto   dataAID = "SourceTwo";
     double valueA  = 2.0;
@@ -129,7 +134,8 @@ BOOST_AUTO_TEST_CASE(SummationActionTwoSources)
       interface.writeScalarData(meshName, dataAID, idC, valueC);
       interface.writeScalarData(meshName, dataAID, idD, valueD);
 
-      dt = interface.advance(dt);
+      interface.advance(dt);
+      double dt = interface.getMaxTimeStepSize();
     }
 
     interface.finalize();

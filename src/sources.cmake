@@ -4,7 +4,7 @@
 
 target_sources(preciceCore
     PRIVATE
-    ${PROJECT_BINARY_DIR}/src/precice/impl/versions.cpp
+    ${CMAKE_BINARY_DIR}/src/precice/impl/versions.cpp
     ${PROJECT_BINARY_DIR}/src/precice/impl/versions.hpp
     src/acceleration/Acceleration.cpp
     src/acceleration/Acceleration.hpp
@@ -265,6 +265,7 @@ target_sources(preciceCore
     src/precice/impl/WatchPoint.hpp
     src/precice/impl/WriteDataContext.cpp
     src/precice/impl/WriteDataContext.hpp
+    src/precice/span.hpp
     src/precice/types.hpp
     src/profiling/Event.cpp
     src/profiling/Event.hpp
@@ -314,7 +315,6 @@ target_sources(preciceCore
     src/utils/fmtSTL.hpp
     src/utils/networking.cpp
     src/utils/networking.hpp
-    src/utils/span.hpp
     src/utils/span_tools.hpp
     src/utils/stacktrace.cpp
     src/utils/stacktrace.hpp
@@ -338,5 +338,6 @@ set_property(TARGET precice PROPERTY PUBLIC_HEADER
     ${PROJECT_BINARY_DIR}/src/precice/Version.h
     src/precice/SolverInterface.hpp
     src/precice/Tooling.hpp
+    src/precice/span.hpp
     src/precice/types.hpp
     )

@@ -75,6 +75,9 @@ public:
   /// Removes a computed mapping.
   void clear() final override;
 
+  /// name of the rbf mapping
+  std::string getName() const final override;
+
   friend struct MappingTests::PetRadialBasisFunctionMapping::Serial::SolutionCaching;
 
 private:
@@ -579,6 +582,12 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::clear()
 
   previousSolution.clear();
   this->_hasComputedMapping = false;
+}
+
+template <typename RADIAL_BASIS_FUNCTION_T>
+std::string PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::getName() const
+{
+  return "global-iterative RBF";
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>

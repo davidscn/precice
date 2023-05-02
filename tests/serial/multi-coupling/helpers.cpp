@@ -23,7 +23,8 @@ void multiCouplingThreeSolvers(const std::string configFile, const TestContext &
     auto            dataABID = "DataAB";
     auto            dataBAID = "DataBA";
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
     double valueRead;
 
     BOOST_TEST(cplInterface.isCouplingOngoing());
@@ -33,10 +34,11 @@ void multiCouplingThreeSolvers(const std::string configFile, const TestContext &
       }
 
       cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.requiresReadingCheckpoint()) {
       }
-      cplInterface.readScalarData(meshName, dataBAID, vertexID, valueRead);
+      cplInterface.readScalarData(meshName, dataBAID, vertexID, maxDt, valueRead);
     }
 
     BOOST_TEST(valueRead == valueB);
@@ -53,7 +55,8 @@ void multiCouplingThreeSolvers(const std::string configFile, const TestContext &
     auto            dataCBID  = "DataCB";
     auto            dataBCID  = "DataBC";
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
     double valueReadA, valueReadC;
 
     BOOST_TEST(cplInterface.isCouplingOngoing());
@@ -64,11 +67,12 @@ void multiCouplingThreeSolvers(const std::string configFile, const TestContext &
       }
 
       cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.requiresReadingCheckpoint()) {
       }
-      cplInterface.readScalarData(meshName1, dataABID, vertexID1, valueReadA);
-      cplInterface.readScalarData(meshName2, dataCBID, vertexID2, valueReadC);
+      cplInterface.readScalarData(meshName1, dataABID, vertexID1, maxDt, valueReadA);
+      cplInterface.readScalarData(meshName2, dataCBID, vertexID2, maxDt, valueReadC);
     }
 
     BOOST_TEST(valueReadA == 1.0);
@@ -83,7 +87,8 @@ void multiCouplingThreeSolvers(const std::string configFile, const TestContext &
     auto            dataCBID = "DataCB";
     auto            dataBCID = "DataBC";
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
     double valueRead;
 
     BOOST_TEST(cplInterface.isCouplingOngoing());
@@ -94,10 +99,11 @@ void multiCouplingThreeSolvers(const std::string configFile, const TestContext &
       }
 
       cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.requiresReadingCheckpoint()) {
       }
-      cplInterface.readScalarData(meshName, dataBCID, vertexID, valueRead);
+      cplInterface.readScalarData(meshName, dataBCID, vertexID, maxDt, valueRead);
     }
 
     BOOST_TEST(valueRead == 2.0);
@@ -117,7 +123,8 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
     auto            dataABID = "DataAB";
     auto            dataBAID = "DataBA";
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
     double valueRead;
     double valueWrite = 1.0;
 
@@ -128,10 +135,11 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
       }
 
       cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.requiresReadingCheckpoint()) {
       }
-      cplInterface.readScalarData(meshName, dataBAID, vertexID, valueRead);
+      cplInterface.readScalarData(meshName, dataBAID, vertexID, maxDt, valueRead);
     }
     cplInterface.finalize();
   } else if (context.isNamed("SolverB")) {
@@ -145,7 +153,8 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
     auto            dataCBID  = "DataCB";
     auto            dataBCID  = "DataBC";
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
     double valueReadA, valueReadC;
     double valueWriteA{1.0}, valueWriteC{1.0};
 
@@ -157,11 +166,12 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
       }
 
       cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.requiresReadingCheckpoint()) {
       }
-      cplInterface.readScalarData(meshName1, dataABID, vertexID1, valueReadA);
-      cplInterface.readScalarData(meshName2, dataCBID, vertexID2, valueReadC);
+      cplInterface.readScalarData(meshName1, dataABID, vertexID1, maxDt, valueReadA);
+      cplInterface.readScalarData(meshName2, dataCBID, vertexID2, maxDt, valueReadC);
     }
     cplInterface.finalize();
 
@@ -176,7 +186,8 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
     auto            dataCDID  = "DataCD";
     auto            dataDCID  = "DataDC";
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
     double valueReadA, valueReadC;
     double valueWriteA{1.0}, valueWriteC{1.0};
 
@@ -188,11 +199,12 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
       }
 
       cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.requiresReadingCheckpoint()) {
       }
-      cplInterface.readScalarData(meshName1, dataBCID, vertexID1, valueReadA);
-      cplInterface.readScalarData(meshName2, dataDCID, vertexID2, valueReadC);
+      cplInterface.readScalarData(meshName1, dataBCID, vertexID1, maxDt, valueReadA);
+      cplInterface.readScalarData(meshName2, dataDCID, vertexID2, maxDt, valueReadC);
     }
     cplInterface.finalize();
   } else {
@@ -202,7 +214,8 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
     auto            dataCDID = "DataCD";
     auto            dataDCID = "DataDC";
 
-    double maxDt = cplInterface.initialize();
+    cplInterface.initialize();
+    double maxDt = cplInterface.getMaxTimeStepSize();
     double valueRead;
     double valueWrite = 1.0;
 
@@ -213,10 +226,11 @@ void multiCouplingFourSolvers(const std::string configFile, const TestContext &c
       }
 
       cplInterface.advance(maxDt);
+      maxDt = cplInterface.getMaxTimeStepSize();
 
       if (cplInterface.requiresReadingCheckpoint()) {
       }
-      cplInterface.readScalarData(meshName, dataCDID, vertexID, valueRead);
+      cplInterface.readScalarData(meshName, dataCDID, vertexID, maxDt, valueRead);
     }
     cplInterface.finalize();
   }

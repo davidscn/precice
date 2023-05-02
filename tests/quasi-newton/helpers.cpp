@@ -54,7 +54,8 @@ void runTestQN(std::string const &config, TestContext const &context)
     if (interface.requiresWritingCheckpoint()) {
     }
 
-    interface.readBlockScalarData(meshName, readDataName, 4, vertexIDs, inValues);
+    double preciceDt = interface.getMaxTimeStepSize();
+    interface.readBlockScalarData(meshName, readDataName, 4, vertexIDs, preciceDt, inValues);
 
     /*
       Solves the following non-linear equations, which are extended to a fixed-point equation (simply +x)
@@ -145,9 +146,11 @@ void runTestQNEmptyPartition(std::string const &config, TestContext const &conte
     if (interface.requiresWritingCheckpoint()) {
     }
 
+    double preciceDt = interface.getMaxTimeStepSize();
+
     if ((context.isNamed("SolverOne") and context.isPrimary()) or
         (context.isNamed("SolverTwo") and (not context.isPrimary()))) {
-      interface.readBlockScalarData(meshName, readDataName, 4, vertexIDs, inValues);
+      interface.readBlockScalarData(meshName, readDataName, 4, vertexIDs, preciceDt, inValues);
     }
 
     /*

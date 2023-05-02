@@ -80,4 +80,9 @@ void NearestNeighborMapping::mapConsistent(DataID inputDataID, DataID outputData
   PRECICE_DEBUG("Mapped values = {}", utils::previewRange(3, outputValues));
 }
 
+std::string NearestNeighborMapping::getName() const
+{
+  return "nearest-neighbor";
+}
+
 } // namespace precice::mapping
