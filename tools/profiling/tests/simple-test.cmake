@@ -8,7 +8,7 @@
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 if(NOT FOLDER OR NOT EVENTS_SCRIPT)
-  message(FATAL "Missing arguments")
+  message(FATAL_ERROR "Missing arguments")
 endif()
 
 message(STATUS "Removing previous files")
@@ -18,7 +18,7 @@ message(STATUS "Testing: merge")
 execute_process(COMMAND ${Python3_EXECUTABLE} ${EVENTS_SCRIPT} merge ${FOLDER}
   COMMAND_ECHO STDOUT)
 if(NOT EXISTS "events.json")
-  message(FATAL "No events.json file found")
+  message(FATAL_ERROR "No events.json file found")
 endif()
 
 message(STATUS "Testing: trace")
@@ -26,12 +26,12 @@ execute_process(COMMAND ${Python3_EXECUTABLE} ${EVENTS_SCRIPT} trace
   COMMAND_ECHO STDOUT
   )
 if(NOT EXISTS "trace.json")
-  message(FATAL "No trace.json file found")
+  message(FATAL_ERROR "No trace.json file found")
 endif()
 
 message(STATUS "Testing: export")
 execute_process(COMMAND ${Python3_EXECUTABLE} ${EVENTS_SCRIPT} export
   COMMAND_ECHO STDOUT)
 if(NOT EXISTS "events.csv")
-  message(FATAL "No events.csv file found")
+  message(FATAL_ERROR "No events.csv file found")
 endif()
