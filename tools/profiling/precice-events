@@ -381,52 +381,6 @@ def exportCommand(eventfile, outfile, unit):
     return 0
 
 
-def plotCommand(events, eventfile, unit):
-    requireModules(["pandas", "matplotlib"])
-    import pandas
-    import matplotlib.pyplot as plt
-    import matplotlib
-
-    def to_unit(o): return ns_to_unit(o, unit)
-
-    run = Run(eventfile)
-    total = run.toDataFrame()
-
-    allRanks = list(total[["participant", "rank"]
-                          ].drop_duplicates().itertuples(index=False))
-    colorMap = {pr: c for pr, c in zip(
-        allRanks, matplotlib.cm.tab20(range(len(allRanks))))}
-
-    nevents = len(events)
-    fig, axs = plt.subplots(nrows=nevents, sharex=True)
-    for event, ax in zip(events, axs if nevents > 1 else [axs]):
-        ax.set_title(event)
-        ax.margins(y=0.2)
-        edf = total[total["eid"] == event]
-
-        yticks = []
-
-        for i, (name, group) in enumerate(edf.groupby(["participant", "rank"])):
-            ax.hlines([str(i)]*len(group.ts),
-                      xmin=group.ts.apply(to_unit),
-                      xmax=(group.ts+group.dur).apply(to_unit),
-                      colors=colorMap[name],
-                      linewidth=2
-                      )
-            yticks.append(f"{name[0]}:{name[1]}")
-
-        ax.yaxis.set_major_locator(
-            matplotlib.ticker.FixedLocator(ax.get_yticks()))
-        ax.grid(axis="y", color='0.9')
-        ax.yaxis.tick_right()
-        ax.set_yticklabels(yticks)
-
-    plt.tight_layout()
-    plt.show()
-
-    return 0
-
-
 def analyzeCommand(eventfile, participant, outfile=None, unit='us'):
     requireModules(["pandas"])
     import pandas
@@ -680,14 +634,6 @@ if __name__ == '__main__':
     export.add_argument("-o", "--output", type=str, default="events.csv",
                         help="The CSV file to export to.")
 
-    plot_help = "Plot given events of the recorded events."
-    plot = subparsers.add_parser('plot',
-                                 help=plot_help.splitlines()[0], description=plot_help)
-    plot.add_argument("events", type=str,
-                      help="The events to plot")
-    plot.add_argument("eventfile", nargs="?", type=str, default="events.json",
-                      help="The event file to process")
-
     merge_help = "Transform multiple events to the Trace Event Format."
     merge = subparsers.add_parser('merge',
                                   help=merge_help.splitlines()[0], description=merge_help)
@@ -703,7 +649,6 @@ if __name__ == '__main__':
         "export": lambda ns: exportCommand(ns.eventfile, ns.output, ns.unit),
         "analyze": lambda ns: analyzeCommand(ns.eventfile, ns.participant, ns.output,  ns.unit),
         "compare": lambda ns: compareCommand(ns.eventfile, ns.referencefile, ns.participant, ns.event, ns.output,  ns.unit),
-        "plot": lambda ns: plotCommand(ns.events.split(","), ns.eventfile,  ns.unit),
         "merge": lambda ns: mergeCommand(ns.files, ns.output, not ns.no_align)
     }
 
