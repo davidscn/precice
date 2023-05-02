@@ -422,60 +422,6 @@ def analyzeCommand(eventfile, participant, outfile=None, unit='us'):
     return 0
 
 
-def compareCommand(eventfile, referencefile, participant, event, outfile=None, unit='us'):
-    requireModules(["pandas", "numpy"])
-    import pandas
-    import numpy as np
-
-    df_new = Run(eventfile).toDataFrame()
-    df_ref = Run(referencefile).toDataFrame()
-
-    print(f"Comparing {eventfile} to the reference {referencefile}")
-
-    def preprocess(df):
-        # Filter by participant
-        df = df[df["participant"] == participant].drop("participant", axis=1)
-
-        if event is not None:
-            df = df[df["eid"] == event]
-
-
-        # Convert duration to requested unit
-        df.dur = df.dur.apply(lambda td: ns_to_unit(td, unit))
-        return df
-
-    df_new = preprocess(df_new)
-    df_ref = preprocess(df_ref)
-
-    if event is not None:
-        qs = np.linspace(0,1, 20+1)
-        def quantiles(series):
-            return np.quantile(series, qs)
-
-        new_q = quantiles(df_new["dur"])
-        ref_q = quantiles(df_ref["dur"])
-
-        print(f"r={df_ref.dur.mean()}  n={df_new.dur.mean()}")
-
-        print(f"Quantiles for event {event} of participant {participant}")
-        print(f"Sample counts: reference={len(df_ref)} new={len(df_new)}")
-        print("{:3} {:>8} {:>20} {:>20}".format("qnt", "diff", "reference", "new"))
-        for q, n, r in zip(qs, ref_q, new_q):
-            ratio = (1- n / r)*100
-            print(f"{int(q*100):>3} {ratio:+7.2f}% {n:20f} {r:20f}")
-
-        import matplotlib.pyplot as plt
-        fig = plt.figure()
-        plt.xlabel("Reference")
-        plt.ylabel("New")
-        plt.title("QQ Plot: Observed vs. Expected")
-        plt.plot(ref_q, ref_q,'b-',
-                 ref_q, new_q,'r.')
-        plt.show()
-
-    return 0
-
-
 def detectFiles(files):
     # Default to loading from the local directory
     if not files:
@@ -584,7 +530,7 @@ def mergeCommand(files, outfile, align):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="", epilog="")
     subparsers = parser.add_subparsers(title='commands',
-                                       description='Note that some commands may require pandas or matplotlib',
+                                       description='Note that some commands may require pandas.',
                                        help='additional help',
                                        dest="cmd"
                                        )
@@ -603,19 +549,6 @@ if __name__ == '__main__':
     analyze.add_argument("eventfile", nargs="?", type=str, default="events.json",
                          help="The event file to process")
     analyze.add_argument("-o", "--output",
-                         help="Write the result to CSV file")
-
-    compare_help = "Compare two runs of the same participant."
-    compare = subparsers.add_parser('compare',
-                                    help=compare_help.splitlines()[0], description=compare_help)
-    compare.add_argument("participant", type=str,
-                         help="The participant to compare")
-    compare.add_argument("eventfile", nargs="?", type=str, default="events.json",
-                         help="The event file to process")
-    compare.add_argument("referencefile", type=str, help="The event file to compare to.")
-    compare.add_argument("-e", "--event", type=str, default=None,
-                         help="The event to compare.")
-    compare.add_argument("-o", "--output",
                          help="Write the result to CSV file")
 
     trace_help = "Transform events to the Trace Event Format."
@@ -648,7 +581,6 @@ if __name__ == '__main__':
         "trace": lambda ns: traceCommand(ns.eventfile, ns.output),
         "export": lambda ns: exportCommand(ns.eventfile, ns.output, ns.unit),
         "analyze": lambda ns: analyzeCommand(ns.eventfile, ns.participant, ns.output,  ns.unit),
-        "compare": lambda ns: compareCommand(ns.eventfile, ns.referencefile, ns.participant, ns.event, ns.output,  ns.unit),
         "merge": lambda ns: mergeCommand(ns.files, ns.output, not ns.no_align)
     }
 
