@@ -65,9 +65,11 @@ def printWide(df):
 
 
 def ns_to_unit(obj, unit):
-    import pandas
-    if isinstance(obj, (pandas.Timedelta, pandas.Timestamp)):
-        return ns_to_unit(obj.value, unit)
+    import numbers
+    if not isinstance(obj, (numbers.Integral, numbers.Real)):
+        import pandas
+        if isinstance(obj, (pandas.Timedelta, pandas.Timestamp)):
+            return ns_to_unit(obj.value, unit)
 
     return obj * {
         'ns': 1,
