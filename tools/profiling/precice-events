@@ -540,10 +540,9 @@ def detectFiles(files):
         if os.path.isdir(path):
             print(f"Searching {path} : ", end="")
             candidates = [".",
-                          "precice-run/events",
-                          "events",
-                          "../precice-run/events",
-                          "../../precice-run/events",
+                          "precice-events",
+                          "../precice-events",
+                          "../../precice-events",
                           ]
             found = False
             for candidate in candidates:
