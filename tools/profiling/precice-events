@@ -172,6 +172,7 @@ def groupEvents(events, initTime, nameMapping):
             continue
 
         name = nameMapping[event["eid"]]
+        assert isinstance(name, int)
         # Handle event starts
         if type == "b":
             # assert(name not in active.keys())
@@ -179,6 +180,7 @@ def groupEvents(events, initTime, nameMapping):
                 print(f"Ignoring start of active event {name}")
             else:
                 event["ts"] = int(event["ts"])
+                event["eid"] = name # map to global name
                 active[name] = event
         # Handle event stops
         elif type == "e":
@@ -198,14 +200,16 @@ def groupEvents(events, initTime, nameMapping):
                 print(f"Dropping data event {name} as event isn't yet known.")
             else:
                 d = active[name].get("data", {})
-                d[event["dn"]] = int(event["dv"])
+                dname = nameMapping[event["dn"]]
+                assert isinstance(dname, int)
+                d[dname] = int(event["dv"])
                 active[name]["data"] = d
 
     # Handle leftover events in case of a truncated input file
     if active:
         lastTS = min(map(lambda e: e["ts"] + e["dur"], completed))
         for event in active.values():
-            name = event["eid"]
+            name = event["eid"] # This is a global id
             print(f"Truncating event without end {name}")
             begin = active[name]
             begin["ts"] = int(begin["ts"]) + initTime
@@ -316,7 +320,7 @@ class Run:
         return self.data.keys()
 
     def lookupEvent(self, id):
-        return self.eventLookup[id]
+        return self.eventLookup[int(id)]
 
     def toTrace(self):
         pids = {name: id for id, name in enumerate(self.participants())}
@@ -344,7 +348,7 @@ class Run:
                     "tid": tid,
                     "ts": e["ts"],
                     "dur": e["dur"]
-                }, {} if "data" not in e else {"args": e["data"]}))
+                }, {} if "data" not in e else {"args": dict(zip(map(self.lookupEvent, e["data"].keys()), e["data"].values()))}))
 
         return {"traceEvents": metaEvents + mainEvents}
 
@@ -357,7 +361,7 @@ class Run:
                 "event": self.lookupEvent(e["eid"]),
                 "timestamp": e["ts"],
                 "duration": ns_to_unit(e["dur"]*1e3, unit) if unit else e["dur"],
-                "data": "" if "data" not in e else str(e["data"])
+                "data": "" if "data" not in e else str(dict(zip(map(self.lookupEvent, e["data"].keys()), e["data"].values())))
             }
             for rank in self.iterRanks()
             for e in rank.events
