@@ -55,9 +55,11 @@ private:
   // @brief Root tag of preCICE configuration.
   xml::XMLTag _tag;
 
-  precice::profiling::ProfilingConfiguration _profilingConfig;
-
+  // The log configuration must be constructed first to prevent log clutter
   LogConfiguration _logConfig;
+
+  // Handle other configuration afterwards
+  precice::profiling::ProfilingConfiguration _profilingConfig;
 
   SolverInterfaceConfiguration _solverInterfaceConfig;
 };
