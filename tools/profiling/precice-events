@@ -44,12 +44,24 @@ def readRobust(filename):
 
 
 def printWide(df):
-    import pandas
-    with pandas.option_context('display.width', None,
-                               'display.max_rows', None,
-                               'display.max_columns', None,
-                               'display.max_colwidth', None):
-        print(df)
+    from itertools import repeat
+
+    mincolwidth = 8
+    headerWidths = [ len(f"{c:}") for c in df.columns.to_list() ]
+    bodyWidths = df.applymap(lambda s: len("{:}".format(s))).max().to_list()
+    colwidths = map(max, zip( headerWidths, bodyWidths, repeat(mincolwidth)))
+    colfmts = [ "{:>"+str(w)+"}" for w in colwidths ]
+
+    rowfmt = colfmts[0]
+    # Measurements always come in batches of 5
+    from itertools import islice
+    fmts = iter(colfmts[1:])
+    while batch := list(islice(fmts,5)):
+        rowfmt += " | " + " ".join(batch)
+
+    print(rowfmt.format(*(df.columns)))
+    for index, row in df.fillna("").iterrows():
+        print(rowfmt.format(*row.to_list()))
 
 
 def ns_to_unit(obj, unit):
@@ -394,27 +406,43 @@ def analyzeCommand(eventfile, participant, outfile=None, unit='us'):
 
     # Convert duration to requested unit
     df.dur = df.dur.apply(lambda td: ns_to_unit(td, unit))
+    print(f"Output timing are in {unit}.")
 
-    all = df.groupby("eid").agg(
-        {"dur": [("min", "min"), ("mean", "mean"), ("max", "max"), ("sum", "sum"), ("count", "count")]})
-    all.columns = all.columns.droplevel()
+    ranks = df["rank"].unique()
 
-    isParallel = len(df["rank"].unique()) > 1
-    if isParallel:
+    if len(ranks) == 1:
         primary = df[df["rank"] == 0].groupby("eid").agg(
-            {"dur": [("Pmin", "min"), ("Pmean", "mean"), ("Pmax", "max"), ("Psum", "sum"), ("Pcount", "count")]})
-        secondaries = df[df["rank"] > 0].groupby("eid").agg(
-            {"dur": [("Smin", "min"), ("Smean", "mean"), ("Smax", "max"), ("Ssum", "sum"), ("Scount", "count")]})
-
+            {"dur": [("sum", "sum"), ("count", "count"), ("mean", "mean"), ("min", "min"), ("max", "max")]})
         primary.columns = primary.columns.droplevel()
-        secondaries.columns = secondaries.columns.droplevel()
-
-        joined = pandas.concat([all, primary, secondaries], axis=1)
+        joined = primary
     else:
-        joined = all
+        rankAdvance = df[(df["eid"] == "advance") & (df["rank"] > 0)].groupby("rank").sum("dur")
+        minSecRank = rankAdvance["dur"].idxmin()
+        maxSecRank = rankAdvance["dur"].idxmax()
 
-    joined.index.rename("event", inplace=True)
+        print(f"Selection contains the primary rank 0, the cheapest secondary rank {minSecRank}, and the most expensive secondary rank {maxSecRank}.")
+
+        prefix = "R0"
+        primary = df[df["rank"] == 0].groupby("eid").agg(
+            {"dur": [(f"{prefix}:sum", "sum"), (f"{prefix}:count", "count"), (f"{prefix}:mean", "mean"), (f"{prefix}:min", "min"), (f"{prefix}:max", "max")]})
+        primary.columns = primary.columns.droplevel()
+
+        prefix = f"R{minSecRank}"
+        minSec = df[df["rank"] == minSecRank].groupby("eid").agg(
+            {"dur": [(f"{prefix}:sum", "sum"), (f"{prefix}:count", "count"), (f"{prefix}:mean", "mean"), (f"{prefix}:min", "min"), (f"{prefix}:max", "max")]})
+        minSec.columns = minSec.columns.droplevel()
+
+        prefix = f"R{maxSecRank}"
+        maxSec = df[df["rank"] == maxSecRank].groupby("eid").agg(
+            {"dur": [(f"{prefix}:sum", "sum"), (f"{prefix}:count", "count"), (f"{prefix}:mean", "mean"), (f"{prefix}:min", "min"), (f"{prefix}:max", "max")]})
+        maxSec.columns = maxSec.columns.droplevel()
+
+        joined = pandas.concat([primary, minSec, maxSec], axis=1)
+
+    joined.reset_index(inplace=True, names="event")
+
     printWide(joined)
+
     if (outfile):
         print(f"Writing to {outfile}")
         joined.to_csv(outfile)
@@ -539,8 +567,8 @@ if __name__ == '__main__':
                         help="The duration unit to use")
 
     analyze_help = """Analyze events data of a given solver.
-    Events durations are displayed in the unit of choice and grouped in three sections:
-    For parallel solvers, aggregates over all ranks, only the Primary rank, and only the Secondary ranks.
+    Event durations are displayed in the unit of choice.
+    Parallel solvers show events of the primary rank next to the secondary ranks spending the least and most time in advance of preCICE.
     """
     analyze = subparsers.add_parser('analyze',
                                     help=analyze_help.splitlines()[0], description=analyze_help)
