@@ -8,7 +8,7 @@ namespace precice::profiling {
 
 constexpr int         DEFAULT_SYNC_EVERY = 50;
 constexpr const char *DEFAULT_MODE       = "fundamental";
-constexpr const char *DEFAULT_DIRECTORY  = "..";
+constexpr const char *DEFAULT_DIRECTORY  = ".";
 
 /**
  * @brief Configuration class for exports.

@@ -35,7 +35,7 @@ ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
 
   auto attrDirectory = makeXMLAttribute<std::string>("directory", DEFAULT_DIRECTORY)
                            .setDocumentation("Directory to use as a root directory to  write the events to. "
-                                             "Events will be written to `<directory>/precice-run/events/`");
+                                             "Events will be written to `<directory>/precice-events/`");
   tag.addAttribute(attrDirectory);
 
   parent.addSubtag(tag);
@@ -85,8 +85,7 @@ void applyDefaults()
   er.setWriteQueueMax(DEFAULT_SYNC_EVERY);
 
   auto directory = boost::filesystem::path(DEFAULT_DIRECTORY);
-  directory /= "precice-run";
-  directory /= "events";
+  directory /= "precice-events";
   er.setDirectory(directory.string());
 
   er.setMode(fromString(DEFAULT_MODE));
