@@ -126,12 +126,15 @@ SolverInterfaceImpl::SolverInterfaceImpl(
   logging::setParticipant(_accessorName);
 
   profiling::EventRegistry::instance().initialize(_accessorName, _accessorProcessRank, _accessorCommunicatorSize);
+  profiling::applyDefaults();
+  Event                        e("construction", profiling::Fundamental);
+  profiling::ScopedEventPrefix sep("construction/");
 
   Event e1("configure", profiling::Fundamental);
   configure(configurationFileName);
   e1.stop();
 
-  // Backend settings have been configure
+  // Backend settings have been configured
   profiling::EventRegistry::instance().startBackend();
 
   PRECICE_DEBUG("Initialize intra-participant communication");
@@ -154,6 +157,8 @@ SolverInterfaceImpl::SolverInterfaceImpl(
   }
 #endif
 
+  e.stop();
+  sep.pop();
   _solverInitEvent = std::make_unique<profiling::Event>("solver.initialize", profiling::Fundamental, profiling::Synchronize);
 }
 

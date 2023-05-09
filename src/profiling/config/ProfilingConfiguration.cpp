@@ -12,7 +12,6 @@
 namespace precice::profiling {
 
 namespace {
-
 profiling::Mode fromString(std::string_view mode)
 {
   if (mode == MODE_OFF) {
@@ -25,26 +24,10 @@ profiling::Mode fromString(std::string_view mode)
     PRECICE_UNREACHABLE("Unknown mode \"{}\"", mode);
   }
 }
-
-void applyDefaults()
-{
-  auto &er = profiling::EventRegistry::instance();
-
-  er.setWriteQueueMax(DEFAULT_SYNC_EVERY);
-
-  auto directory = boost::filesystem::path(DEFAULT_DIRECTORY);
-  directory /= "precice-events";
-  er.setDirectory(directory.string());
-
-  er.setMode(fromString(DEFAULT_MODE));
-}
-
 } // namespace
 
 ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
 {
-  profiling::applyDefaults();
-
   using namespace xml;
 
   XMLTag tag(*this, "profiling", XMLTag::OCCUR_NOT_OR_ONCE);
@@ -92,6 +75,19 @@ void ProfilingConfiguration::xmlTagCallback(
   er.setDirectory(directory.string());
 
   er.setMode(fromString(mode));
+}
+
+void applyDefaults()
+{
+  auto &er = profiling::EventRegistry::instance();
+
+  er.setWriteQueueMax(DEFAULT_SYNC_EVERY);
+
+  auto directory = boost::filesystem::path(DEFAULT_DIRECTORY);
+  directory /= "precice-events";
+  er.setDirectory(directory.string());
+
+  er.setMode(fromString(DEFAULT_MODE));
 }
 
 } // namespace precice::profiling

@@ -138,7 +138,7 @@ private:
   std::string _directory;
 
   /// The operational mode of the registry
-  Mode _mode = Mode::Off;
+  Mode _mode = Mode::Fundamental;
 
   /// The rank/number of parallel instance of the current program
   int _rank;

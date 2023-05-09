@@ -97,7 +97,7 @@ def alignEvents(events):
             continue
         print(f"Aligning {len(ranks)} ranks of {participant}")
         intraSyncID = [id for id, name in events["eventDict"].items(
-        ) if name == "com.initializeIntraCom"][0]
+        ) if "com.initializeIntraCom" in name][0]
         syncs = {rank: e["ts"]+e["dur"]
                  for rank, data in ranks.items()
                  for e in data["events"]

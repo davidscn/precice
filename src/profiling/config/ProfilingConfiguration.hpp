@@ -30,4 +30,6 @@ private:
   logging::Logger _log{"profiling::ProfilingConfiguration"};
 };
 
+void applyDefaults();
+
 } // namespace precice::profiling
