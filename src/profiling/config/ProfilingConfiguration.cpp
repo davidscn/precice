@@ -11,15 +11,47 @@
 
 namespace precice::profiling {
 
+namespace {
+
+profiling::Mode fromString(std::string_view mode)
+{
+  if (mode == MODE_OFF) {
+    return profiling::Mode::Off;
+  } else if (mode == MODE_FUNDAMENTAL) {
+    return profiling::Mode::Fundamental;
+  } else if (mode == MODE_ALL) {
+    return profiling::Mode::All;
+  } else {
+    PRECICE_UNREACHABLE("Unknown mode \"{}\"", mode);
+  }
+}
+
+void applyDefaults()
+{
+  auto &er = profiling::EventRegistry::instance();
+
+  er.setWriteQueueMax(DEFAULT_SYNC_EVERY);
+
+  auto directory = boost::filesystem::path(DEFAULT_DIRECTORY);
+  directory /= "precice-events";
+  er.setDirectory(directory.string());
+
+  er.setMode(fromString(DEFAULT_MODE));
+}
+
+} // namespace
+
 ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
 {
+  profiling::applyDefaults();
+
   using namespace xml;
 
   XMLTag tag(*this, "profiling", XMLTag::OCCUR_NOT_OR_ONCE);
   tag.setDocumentation("Allows configuring the profiling functionality of preCICE.");
 
   auto attrMode = makeXMLAttribute<std::string>("mode", DEFAULT_MODE)
-                      .setOptions({"off", "fundamental", "all"})
+                      .setOptions({MODE_ALL, MODE_FUNDAMENTAL, MODE_OFF})
                       .setDocumentation("Operational modes of the profiling. "
                                         "\"fundamental\" will only write fundamental events. "
                                         "\"all\" writes all events.");
@@ -41,21 +73,6 @@ ProfilingConfiguration::ProfilingConfiguration(xml::XMLTag &parent)
   parent.addSubtag(tag);
 }
 
-namespace {
-profiling::Mode fromString(std::string_view mode)
-{
-  if (mode == "off") {
-    return profiling::Mode::Off;
-  } else if (mode == "fundamental") {
-    return profiling::Mode::Fundamental;
-  } else if (mode == "all") {
-    return profiling::Mode::All;
-  } else {
-    PRECICE_UNREACHABLE("Unknown mode \"{}\"", mode);
-  }
-}
-} // namespace
-
 void ProfilingConfiguration::xmlTagCallback(
     const xml::ConfigurationContext &context,
     xml::XMLTag &                    tag)
@@ -71,24 +88,10 @@ void ProfilingConfiguration::xmlTagCallback(
 
   er.setWriteQueueMax(flushEvery);
 
-  directory /= "precice-run";
-  directory /= "events";
-  er.setDirectory(directory.string());
-
-  er.setMode(fromString(mode));
-}
-
-void applyDefaults()
-{
-  auto &er = profiling::EventRegistry::instance();
-
-  er.setWriteQueueMax(DEFAULT_SYNC_EVERY);
-
-  auto directory = boost::filesystem::path(DEFAULT_DIRECTORY);
   directory /= "precice-events";
   er.setDirectory(directory.string());
 
-  er.setMode(fromString(DEFAULT_MODE));
+  er.setMode(fromString(mode));
 }
 
 } // namespace precice::profiling

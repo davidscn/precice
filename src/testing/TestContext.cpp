@@ -206,9 +206,11 @@ void TestContext::initializeEvents()
 {
   if (!invalid && _events) {
     auto &er = precice::profiling::EventRegistry::instance();
-    er.setMode(precice::profiling::Mode::All);
-    er.setDirectory("./precice-run/events");
     er.initialize(name, rank, size);
+    er.setMode(precice::profiling::Mode::All);
+    er.setDirectory("./precice-events");
+    er.initialize(name, rank, size);
+    er.startBackend();
   }
 }
 

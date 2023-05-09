@@ -105,6 +105,9 @@ public:
   /// Sets the operational mode of the registry.
   void setMode(Mode mode);
 
+  /// Create the file and starts the filestream if profiling is turned on
+  void startBackend();
+
   /// Sets the global end time and flushes buffers
   void finalize();
 
@@ -162,9 +165,6 @@ private:
 
   /// The initial time, used to describe when the run started.
   std::chrono::system_clock::time_point _initTime;
-
-  /// Create the file and starts the filestream
-  void startBackend();
 
   /// Stops the global event, flushes the buffers and closes the filestream
   void stopBackend();

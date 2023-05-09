@@ -60,10 +60,6 @@ void EventRegistry::initialize(std::string applicationName, int rank, int size)
   this->_initTime        = initTime;
   this->_initClock       = initClock;
 
-  if (_mode != Mode::Off) {
-    startBackend();
-  }
-
   _initialized = true;
   _finalized   = false;
 }
@@ -85,7 +81,10 @@ void EventRegistry::setMode(Mode mode)
 
 void EventRegistry::startBackend()
 {
-  PRECICE_ASSERT(_mode != Mode::Off, "The profiling is off.")
+  if (_mode == Mode::Off) {
+    PRECICE_DEBUG("Profiling is turned off. Backend will not start.");
+    return;
+  }
   // Create the directory if necessary
   bool isLocal = _directory.empty() || _directory == ".";
   if (!isLocal) {
@@ -127,7 +126,9 @@ void EventRegistry::startBackend()
 
 void EventRegistry::stopBackend()
 {
-  PRECICE_ASSERT(_mode != Mode::Off, "The profiling is off.")
+  if (_mode == Mode::Off) {
+    return;
+  }
   // create end of global event
   auto now = Event::Clock::now();
   put(StopEntry{0, now});
@@ -143,9 +144,7 @@ void EventRegistry::finalize()
   if (_finalized)
     return;
 
-  if (_mode != Mode::Off) {
-    stopBackend();
-  }
+  stopBackend();
 
   _initialized = false;
   _finalized   = true;
@@ -210,6 +209,7 @@ void EventRegistry::flush()
   if (_mode == Mode::Off) {
     return;
   }
+  PRECICE_ASSERT(_output, "Filestream doesn't exist.");
 
   EventWriter ew{_output, _initClock};
   std::for_each(_writeQueue.begin(), _writeQueue.end(), [&ew](const auto &pe) { std::visit(ew, pe); });

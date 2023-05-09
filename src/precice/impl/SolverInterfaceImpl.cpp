@@ -125,7 +125,19 @@ SolverInterfaceImpl::SolverInterfaceImpl(
 
   logging::setParticipant(_accessorName);
 
+  profiling::EventRegistry::instance().initialize(_accessorName, _accessorProcessRank, _accessorCommunicatorSize);
+
+  Event e1("configure", profiling::Fundamental);
   configure(configurationFileName);
+  e1.stop();
+
+  // Backend settings have been configure
+  profiling::EventRegistry::instance().startBackend();
+
+  PRECICE_DEBUG("Initialize intra-participant communication");
+  if (utils::IntraComm::isParallel()) {
+    initializeIntraCommunication();
+  }
 
 // This block cannot be merge with the one above as only configure calls
 // utils::Parallel::initializeMPI, which is needed for getProcessRank.
@@ -175,6 +187,7 @@ SolverInterfaceImpl::~SolverInterfaceImpl()
 void SolverInterfaceImpl::configure(
     std::string_view configurationFileName)
 {
+
   config::Configuration config;
   utils::Parallel::initializeManagedMPI(nullptr, nullptr);
   logging::setMPIRank(utils::Parallel::current()->rank());
@@ -215,10 +228,6 @@ void SolverInterfaceImpl::configure(
 {
   PRECICE_TRACE();
 
-  profiling::EventRegistry::instance().initialize(_accessorName, _accessorProcessRank, _accessorCommunicatorSize);
-  profiling::applyDefaults();
-  Event e("configure", profiling::Fundamental);
-
   _meshLock.clear();
 
   _dimensions         = config.getDimensions();
@@ -252,13 +261,6 @@ void SolverInterfaceImpl::configure(
   // writing is allowed after configuration.
   for (const MeshContext *meshContext : _accessor->usedMeshContexts()) {
     _meshLock.add(meshContext->mesh->getName(), false);
-  }
-
-  e.stop();
-
-  PRECICE_DEBUG("Initialize intra-participant communication");
-  if (utils::IntraComm::isParallel()) {
-    initializeIntraCommunication();
   }
 }
 
