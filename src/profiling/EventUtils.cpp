@@ -60,6 +60,10 @@ void EventRegistry::initialize(std::string applicationName, int rank, int size)
   this->_initTime        = initTime;
   this->_initClock       = initClock;
 
+  _writeQueue.clear();
+  _firstwrite = true;
+  _globalId   = -1;
+
   _initialized = true;
   _finalized   = false;
 }
@@ -116,7 +120,8 @@ void EventRegistry::startBackend()
   PRECICE_DEBUG("Starting backend with events-file: \"{}\"", filename);
   _output.open(filename);
   PRECICE_CHECK(_output, "Unable to open the events-file: \"{}\"", filename);
-  _nameDict.emplace("_GLOBAL", 0);
+  _globalId = nameToID("_GLOBAL");
+  _writeQueue.emplace_back(StartEntry{_globalId, _initClock});
 
   // write header
   fmt::print(_output,
@@ -130,7 +135,7 @@ void EventRegistry::startBackend()
   "mode": "{}"
   }},
   "events":[
-    {{"et":"n","en":"_GLOBAL","eid":0}},{{"et":"b","eid":0,"ts":0}})",
+  )",
              _applicationName,
              _rank,
              _size,
@@ -138,7 +143,6 @@ void EventRegistry::startBackend()
              timepoint_to_string(_initTime),
              toString(_mode));
   _output.flush();
-  _writeQueue.clear();
 }
 
 void EventRegistry::stopBackend()
@@ -148,7 +152,7 @@ void EventRegistry::stopBackend()
   }
   // create end of global event
   auto now = Event::Clock::now();
-  put(StopEntry{0, now});
+  put(StopEntry{_globalId, now});
   // flush the queue
   flush();
   _output << "]}";
@@ -185,6 +189,7 @@ namespace {
 struct EventWriter {
   std::ostream &           out;
   Event::Clock::time_point initClock;
+  std::string              prefix;
 
   auto sinceInit(Event::Clock::time_point tp)
   {
@@ -194,42 +199,50 @@ struct EventWriter {
   void operator()(const StartEntry &se)
   {
     fmt::print(out,
-               R"(,{{"et":"{}","eid":{},"ts":{}}})",
-               se.type, se.eid, sinceInit(se.clock));
+               R"({}{{"et":"{}","eid":{},"ts":{}}})",
+               prefix, se.type, se.eid, sinceInit(se.clock));
   }
 
   void operator()(const StopEntry &se)
   {
     fmt::print(out,
-               R"(,{{"et":"{}","eid":{},"ts":{}}})",
-               se.type, se.eid, sinceInit(se.clock));
+               R"({}{{"et":"{}","eid":{},"ts":{}}})",
+               prefix, se.type, se.eid, sinceInit(se.clock));
   }
 
   void operator()(const DataEntry &de)
   {
     fmt::print(out,
-               R"(,{{"et":"{}","eid":{},"ts":{},"dn":{},"dv":"{}"}})",
-               de.type, de.eid, sinceInit(de.clock), de.did, de.dvalue);
+               R"({}{{"et":"{}","eid":{},"ts":{},"dn":{},"dv":"{}"}})",
+               prefix, de.type, de.eid, sinceInit(de.clock), de.did, de.dvalue);
   }
 
   void operator()(const NameEntry &ne)
   {
     fmt::print(out,
-               R"(,{{"et":"n","en":"{}","eid":{}}})",
-               ne.name, ne.id);
+               R"({}{{"et":"n","en":"{}","eid":{}}})",
+               prefix, ne.name, ne.id);
   }
 };
 } // namespace
 
 void EventRegistry::flush()
 {
-  if (_mode == Mode::Off) {
+  if (_mode == Mode::Off || _writeQueue.empty()) {
     return;
   }
   PRECICE_ASSERT(_output, "Filestream doesn't exist.");
 
-  EventWriter ew{_output, _initClock};
-  std::for_each(_writeQueue.begin(), _writeQueue.end(), [&ew](const auto &pe) { std::visit(ew, pe); });
+  auto first = _writeQueue.begin();
+  // Don't prefix the first write with a comma
+  if (_firstwrite) {
+    std::visit(EventWriter{_output, _initClock, ""}, _writeQueue.front());
+    ++first;
+    _firstwrite = false;
+  }
+
+  EventWriter ew{_output, _initClock, ","};
+  std::for_each(first, _writeQueue.end(), [&ew](const auto &pe) { std::visit(ew, pe); });
 
   _output.flush();
   _writeQueue.clear();

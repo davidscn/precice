@@ -146,6 +146,12 @@ private:
   /// The amount of parallel instances of the current program
   int _size;
 
+  /// Indicator for the first record to be written
+  bool _firstwrite;
+
+  /// The id of the global event
+  int _globalId;
+
   /// Private, empty constructor for singleton pattern
   EventRegistry() = default;
 
