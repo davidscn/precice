@@ -79,6 +79,21 @@ void EventRegistry::setMode(Mode mode)
   _mode = mode;
 }
 
+namespace {
+std::string toString(Mode m)
+{
+  switch (m) {
+  case (Mode::Off):
+    return "off";
+  case (Mode::Fundamental):
+    return "fundamental";
+  case (Mode::All):
+    return "all";
+  }
+  PRECICE_UNREACHABLE("Unknown mode");
+}
+} // namespace
+
 void EventRegistry::startBackend()
 {
   if (_mode == Mode::Off) {
@@ -107,11 +122,12 @@ void EventRegistry::startBackend()
   fmt::print(_output,
              R"({{
   "meta":{{
-  "name" : "{}",
-  "rank" : "{}",
-  "size" : "{}",
-  "unix_us" : "{}",
-  "tinit": "{}"
+  "name": "{}",
+  "rank": "{}",
+  "size": "{}",
+  "unix_us": "{}",
+  "tinit": "{}",
+  "mode": "{}"
   }},
   "events":[
     {{"et":"n","en":"_GLOBAL","eid":0}},{{"et":"b","eid":0,"ts":0}})",
@@ -119,7 +135,8 @@ void EventRegistry::startBackend()
              _rank,
              _size,
              std::chrono::duration_cast<std::chrono::microseconds>(_initTime.time_since_epoch()).count(),
-             timepoint_to_string(_initTime));
+             timepoint_to_string(_initTime),
+             toString(_mode));
   _output.flush();
   _writeQueue.clear();
 }
