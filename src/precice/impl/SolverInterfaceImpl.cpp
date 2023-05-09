@@ -135,7 +135,9 @@ SolverInterfaceImpl::SolverInterfaceImpl(
   e1.stop();
 
   // Backend settings have been configured
+  Event e2("startProfilingBackend");
   profiling::EventRegistry::instance().startBackend();
+  e2.stop();
 
   PRECICE_DEBUG("Initialize intra-participant communication");
   if (utils::IntraComm::isParallel()) {
