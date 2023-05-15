@@ -435,7 +435,7 @@ if (PRECICE_GinkgoParallelization)
   if(PRECICE_WITH_CUDA)
     target_compile_definitions(preciceCore PUBLIC PRECICE_WITH_CUDA)
     target_sources(preciceCore PRIVATE ${PROJECT_SOURCE_DIR}/src/mapping/device/CudaQRSolver.cuh ${PROJECT_SOURCE_DIR}/src/mapping/device/CudaQRSolver.cu)
-    target_link_libraries(preciceCore PUBLIC cusolver)
+    target_link_libraries(preciceCore PUBLIC cusolver cublas)
     message(STATUS "Enabled CUDA support for preCICE via the Ginkgo library.")
   endif()
 

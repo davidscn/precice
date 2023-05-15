@@ -241,11 +241,11 @@ GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::GinkgoRadialBasisFctSolver(
   _scalarNegativeOne = gko::share(gko::initialize<GinkgoScalar>({-1.0}, _deviceExecutor));
 
   // Now we fill the RBF system matrix on the GPU (or any other selected device)
-  _allocCopyEvent.start();
-  _rbfCoefficients = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{n, 1}));
-  _allocCopyEvent.pause();
+  // _allocCopyEvent.start();
+  // _rbfCoefficients = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{n, 1}));
+  // _allocCopyEvent.pause();
   // Initial guess is required since uninitialized memory could lead to a never converging system
-  _rbfCoefficients->fill(0.0);
+  // _rbfCoefficients->fill(0.0);
 
   // We need to copy the input data into a CPU stored vector first and copy it to the GPU afterwards
   // To allow for coalesced memory accesses on the GPU, we need to store them in transposed order IFF the backend is the GPU
@@ -415,7 +415,7 @@ GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::GinkgoRadialBasisFctSolver(
   } else if (_solverType == GinkgoSolverType::QR) {
     const std::size_t M = _rbfSystemMatrix->get_size()[0];
     const std::size_t N = _rbfSystemMatrix->get_size()[1];
-    _decompMatrixQ_T    = gko::share(GinkgoMatrix::create(_deviceExecutor, gko::dim<2>(N, M)));
+    // _decompMatrixQ_T    = gko::share(GinkgoMatrix::create(_deviceExecutor, gko::dim<2>(N, M)));
 
     if ("cuda-executor" == ginkgoParameter.executor) {
 #ifdef PRECICE_WITH_CUDA
@@ -430,16 +430,16 @@ GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::GinkgoRadialBasisFctSolver(
     } else {
       PRECICE_UNREACHABLE("Not implemented");
     }
-    _rbfSystemMatrix->transpose(gko::lend(_decompMatrixQ_T));
+    // _rbfSystemMatrix->transpose(gko::lend(_decompMatrixQ_T));
 
-    _dQ_T_Rhs = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_decompMatrixQ_T->get_size()[0], 1}));
+    // _dQ_T_Rhs = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_decompMatrixQ_T->get_size()[0], 1}));
 
     // auto triangularSolverFactory  = triangular::build().on(_deviceExecutor);
     // _triangularSolver             = gko::share(triangularSolverFactory->generate(_decompMatrixR));
-    auto triangularSolverFactory2 = gko::solver::LowerTrs<>::build().on(_deviceExecutor);
-    _triangularSolverforward      = gko::share(triangularSolverFactory2->generate(_rbfSystemMatrix));
-    auto triangularSolverFactory3 = triangular::build().on(_deviceExecutor);
-    _triangularSolverbackward     = gko::share(triangularSolverFactory3->generate(_rbfSystemMatrix->transpose()));
+    // auto triangularSolverFactory2 = gko::solver::LowerTrs<>::build().on(_deviceExecutor);
+    // _triangularSolverforward      = gko::share(triangularSolverFactory2->generate(_rbfSystemMatrix));
+    // auto triangularSolverFactory3 = triangular::build().on(_deviceExecutor);
+    // _triangularSolverbackward     = gko::share(triangularSolverFactory3->generate(_rbfSystemMatrix->transpose()));
   } else {
     PRECICE_UNREACHABLE("Unknown solver type");
   }
@@ -509,19 +509,21 @@ Eigen::VectorXd GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::solveConsis
   if (GinkgoSolverType::QR == _solverType) {
     // _decompMatrixQ_T->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
     // _triangularSolverforward->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
-    _triangularSolverforward->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
-    _triangularSolverbackward->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
+    // _triangularSolverforward->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
+    // _triangularSolverbackward->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
+    solvewithQRDecompositionCuda(_ginkgoParameter.deviceId, gko::lend(_rbfSystemMatrix), gko::lend(dRhs), true);
+    solvewithQRDecompositionCuda(_ginkgoParameter.deviceId, gko::lend(_rbfSystemMatrix), gko::lend(dRhs), false);
   } else {
     _solveRBFSystem(dRhs);
   }
 
-  dRhs->clear();
+  // dRhs->clear();
 
   _allocCopyEvent.start();
-  auto dOutput = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_matrixA->get_size()[0], _rbfCoefficients->get_size()[1]}));
+  auto dOutput = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_matrixA->get_size()[0], dRhs->get_size()[1]}));
   _allocCopyEvent.pause();
 
-  _matrixA->apply(gko::lend(_rbfCoefficients), gko::lend(dOutput));
+  _matrixA->apply(gko::lend(dRhs), gko::lend(dOutput));
 
   if (polynomial == Polynomial::SEPARATE) {
     _matrixV->apply(gko::lend(_polynomialContribution), gko::lend(_addPolynomialContribution));
@@ -566,19 +568,21 @@ Eigen::VectorXd GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::solveConser
     // _decompMatrixQ_T->apply(gko::lend(dAu), gko::lend(_dQ_T_Rhs));
     // _triangularSolver->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
 
-    _triangularSolverbackward->transpose()->apply(gko::lend(dAu), gko::lend(_dQ_T_Rhs));
-    _triangularSolverbackward->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
+    // _triangularSolverforward->apply(gko::lend(dAu), gko::lend(_dQ_T_Rhs));
+    // _triangularSolverbackward->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
+    solvewithQRDecompositionCuda(_ginkgoParameter.deviceId, gko::lend(_rbfSystemMatrix), gko::lend(dAu), true);
+    solvewithQRDecompositionCuda(_ginkgoParameter.deviceId, gko::lend(_rbfSystemMatrix), gko::lend(dAu), false);
   } else {
     _solveRBFSystem(dAu);
   }
 
-  auto dOutput = gko::clone(_deviceExecutor, _rbfCoefficients);
+  auto dOutput = gko::clone(_deviceExecutor, dAu);
 
   if (polynomial == Polynomial::SEPARATE) {
     auto dEpsilon = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_matrixV->get_size()[1], dRhs->get_size()[1]}));
     _matrixV->transpose()->apply(gko::lend(dRhs), gko::lend(dEpsilon));
 
-    auto dTmp = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_matrixQ->get_size()[1], _rbfCoefficients->get_size()[1]}));
+    auto dTmp = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_matrixQ->get_size()[1], dRhs->get_size()[1]}));
     _matrixQ->transpose()->apply(gko::lend(dOutput), gko::lend(dTmp));
 
     // epsilon -= tmp
