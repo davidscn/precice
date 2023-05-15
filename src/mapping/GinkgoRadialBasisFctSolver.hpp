@@ -164,6 +164,10 @@ private:
 
   /// Backwards Solver
   std::shared_ptr<triangular> _triangularSolver;
+  /// Backwards Solver
+  std::shared_ptr<gko::solver::LowerTrs<>> _triangularSolverforward;
+  /// Backwards Solver
+  std::shared_ptr<gko::solver::UpperTrs<>> _triangularSolverbackward;
 
   /// QR Solver
   // std::unique_ptr<QRSolver> _qrSolver;
@@ -431,8 +435,12 @@ GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::GinkgoRadialBasisFctSolver(
 
     _dQ_T_Rhs = gko::share(GinkgoVector::create(_deviceExecutor, gko::dim<2>{_decompMatrixQ_T->get_size()[0], 1}));
 
-    auto triangularSolverFactory = triangular::build().on(_deviceExecutor);
-    _triangularSolver            = gko::share(triangularSolverFactory->generate(_decompMatrixR));
+    // auto triangularSolverFactory  = triangular::build().on(_deviceExecutor);
+    // _triangularSolver             = gko::share(triangularSolverFactory->generate(_decompMatrixR));
+    // auto triangularSolverFactory2 = triangular::build().on(_deviceExecutor);
+    // _triangularSolverforward      = gko::share(triangularSolverFactory2->generate(_rbfSystemMatrix));
+    auto triangularSolverFactory3 = triangular::build().on(_deviceExecutor);
+    _triangularSolverbackward     = gko::share(triangularSolverFactory3->generate(_decompMatrixR));
   } else {
     PRECICE_UNREACHABLE("Unknown solver type");
   }
@@ -500,8 +508,10 @@ Eigen::VectorXd GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::solveConsis
   }
 
   if (GinkgoSolverType::QR == _solverType) {
-    _decompMatrixQ_T->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
-    _triangularSolver->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
+    // _decompMatrixQ_T->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
+    // _triangularSolverforward->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
+    _triangularSolverbackward->transpose()->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
+    _triangularSolverbackward->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
   } else {
     _solveRBFSystem(dRhs);
   }
@@ -554,8 +564,11 @@ Eigen::VectorXd GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::solveConser
   _matrixA->transpose()->apply(gko::lend(dRhs), gko::lend(dAu));
 
   if (GinkgoSolverType::QR == _solverType) {
-    _decompMatrixQ_T->apply(gko::lend(dAu), gko::lend(_dQ_T_Rhs));
-    _triangularSolver->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
+    // _decompMatrixQ_T->apply(gko::lend(dAu), gko::lend(_dQ_T_Rhs));
+    // _triangularSolver->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
+
+    _triangularSolverbackward->transpose()->apply(gko::lend(dAu), gko::lend(_dQ_T_Rhs));
+    _triangularSolverbackward->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
   } else {
     _solveRBFSystem(dAu);
   }
