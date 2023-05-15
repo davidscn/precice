@@ -437,8 +437,8 @@ GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::GinkgoRadialBasisFctSolver(
 
     // auto triangularSolverFactory  = triangular::build().on(_deviceExecutor);
     // _triangularSolver             = gko::share(triangularSolverFactory->generate(_decompMatrixR));
-    // auto triangularSolverFactory2 = triangular::build().on(_deviceExecutor);
-    // _triangularSolverforward      = gko::share(triangularSolverFactory2->generate(_rbfSystemMatrix));
+    auto triangularSolverFactory2 = gko::solver::LowerTrs<>::build().on(_deviceExecutor);
+    _triangularSolverforward      = gko::share(triangularSolverFactory2->generate(_rbfSystemMatrix));
     auto triangularSolverFactory3 = triangular::build().on(_deviceExecutor);
     _triangularSolverbackward     = gko::share(triangularSolverFactory3->generate(_decompMatrixR));
   } else {
@@ -510,7 +510,7 @@ Eigen::VectorXd GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::solveConsis
   if (GinkgoSolverType::QR == _solverType) {
     // _decompMatrixQ_T->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
     // _triangularSolverforward->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
-    _triangularSolverbackward->transpose()->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
+    _triangularSolverforward->apply(gko::lend(dRhs), gko::lend(_dQ_T_Rhs));
     _triangularSolverbackward->apply(gko::lend(_dQ_T_Rhs), gko::lend(_rbfCoefficients));
   } else {
     _solveRBFSystem(dRhs);
