@@ -12,7 +12,7 @@
 #include "utils/EventUtils.hpp"
 
 
-void computeQRDecompositionCuda(const int deviceId, const std::shared_ptr<gko::Executor> &exec, gko::matrix::Dense<> *A_Q, gko::matrix::Dense<> *R)
+void computeQRDecompositionCuda(const int deviceId, const std::shared_ptr<gko::Executor> &exec, gko::matrix::Dense<> *A_Q, gko::matrix::Dense<> *)
 {
   int backupDeviceId{};
   cudaGetDevice(&backupDeviceId);
@@ -63,7 +63,7 @@ void computeQRDecompositionCuda(const int deviceId, const std::shared_ptr<gko::E
   assert(cudaSuccess == cudaErrorCode);
 
   // Copy A_T to R s.t. the upper triangle corresponds to R
-  A_Q->transpose(gko::lend(R));
+  // A_Q->transpose(gko::lend(R));
 
   // Compute Q
   // cusolverStatus = cusolverDnDorgqr(solverHandle, M, N, k, A_T->get_values(), lda, dTau, (double *) dWork, dLwork, devInfo);

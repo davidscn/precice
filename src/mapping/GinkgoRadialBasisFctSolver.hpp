@@ -416,7 +416,6 @@ GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::GinkgoRadialBasisFctSolver(
     const std::size_t M = _rbfSystemMatrix->get_size()[0];
     const std::size_t N = _rbfSystemMatrix->get_size()[1];
     _decompMatrixQ_T    = gko::share(GinkgoMatrix::create(_deviceExecutor, gko::dim<2>(N, M)));
-    _decompMatrixR      = gko::share(GinkgoMatrix::create(_deviceExecutor, gko::dim<2>(N, N)));
 
     if ("cuda-executor" == ginkgoParameter.executor) {
 #ifdef PRECICE_WITH_CUDA
@@ -440,7 +439,7 @@ GinkgoRadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::GinkgoRadialBasisFctSolver(
     auto triangularSolverFactory2 = gko::solver::LowerTrs<>::build().on(_deviceExecutor);
     _triangularSolverforward      = gko::share(triangularSolverFactory2->generate(_rbfSystemMatrix));
     auto triangularSolverFactory3 = triangular::build().on(_deviceExecutor);
-    _triangularSolverbackward     = gko::share(triangularSolverFactory3->generate(_decompMatrixR));
+    _triangularSolverbackward     = gko::share(triangularSolverFactory3->generate(_rbfSystemMatrix->transpose()));
   } else {
     PRECICE_UNREACHABLE("Unknown solver type");
   }
