@@ -184,8 +184,8 @@ PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::PetRadialBasisFctMapping(
       _matrixQ("Q"),
       _matrixA("A"),
       _matrixV("V"),
-      _solver("Coefficient Solver"),
-      _QRsolver("QR Solver"),
+      _solver("Coefficient Solver", RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite() && !(polynomial == Polynomial::ON)),
+      _QRsolver("QR Solver", false),
       _AOmapping(nullptr),
       _solverRtol(solverRtol),
       _polynomial(polynomial),
@@ -516,7 +516,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   // divergence check. In practice, the check is very rarely needed with Krylov methods. According to the PETSc
   // people, the rare use cases aim for a bad preconditioner, which is not even used in our configuration.
   // Hence, we can disable the divergence check without concerns.
-  KSPSetTolerances(_solver, _solverRtol, PETSC_DEFAULT, 1e30, PETSC_DEFAULT);
+  KSPSetTolerances(_solver, _solverRtol, PETSC_DEFAULT, 1e35, PETSC_DEFAULT);
   KSPSetInitialGuessNonzero(_solver, PETSC_TRUE);
   CHKERRV(ierr);                            // Reuse the results from the last iteration, held in the out vector.
   KSPSetOptionsPrefix(_solver, "solverC_"); // s.t. options for only this solver can be set on the command line

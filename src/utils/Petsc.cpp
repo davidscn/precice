@@ -606,11 +606,15 @@ void Matrix::viewDraw() const
 
 /////////////////////////////////////////////////////////////////////////
 
-KSPSolver::KSPSolver(std::string name)
+KSPSolver::KSPSolver(std::string name, bool spdMatrix)
 {
   PetscErrorCode ierr = 0;
   ierr                = KSPCreate(utils::Parallel::current()->comm, &ksp);
   CHKERRV(ierr);
+  if (spdMatrix) {
+    ierr = KSPSetType(ksp, KSPCG);
+    CHKERRV(ierr);
+  }
   setName(ksp, std::move(name));
 }
 

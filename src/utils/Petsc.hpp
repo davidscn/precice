@@ -243,7 +243,7 @@ public:
   KSPSolver(const KSPSolver &) = delete;
   KSPSolver &operator=(const KSPSolver &) = delete;
 
-  explicit KSPSolver(std::string name = "");
+  explicit KSPSolver(std::string name, bool spdMatrix);
 
   /// Move constructor, use the implicitly declared.
   KSPSolver(KSPSolver &&other) = default;
