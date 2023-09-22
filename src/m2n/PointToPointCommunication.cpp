@@ -384,18 +384,23 @@ void PointToPointCommunication::acceptConnection(std::string const &acceptorName
   // Accept point-to-point connections (as server) between the current acceptor
   // process (in the current participant) with rank `utils::IntraComm::getRank()'
   // and (multiple) requester processes (in the requester participant).
-  _communication->acceptConnectionAsServer(acceptorName,
-                                           requesterName,
-                                           _mesh->getName(),
-                                           utils::IntraComm::getRank(),
-                                           communicationMap.size());
-
+  {
+    Event e5("m2n.createCommunications-accept");
+    _communication->acceptConnectionAsServer(acceptorName,
+                                             requesterName,
+                                             _mesh->getName(),
+                                             utils::IntraComm::getRank(),
+                                             communicationMap.size());
+  }
   PRECICE_DEBUG("Store communication map");
-  for (auto const &comMap : communicationMap) {
-    int  globalRequesterRank = comMap.first;
-    auto indices             = std::move(communicationMap[globalRequesterRank]);
+  {
+    Event e6("m2n.createCommunications-storeMap");
+    for (auto const &comMap : communicationMap) {
+      int  globalRequesterRank = comMap.first;
+      auto indices             = std::move(communicationMap[globalRequesterRank]);
 
-    _mappings.push_back({globalRequesterRank, std::move(indices), com::PtrRequest(), {}});
+      _mappings.push_back({globalRequesterRank, std::move(indices), com::PtrRequest(), {}});
+    }
   }
   e4.stop();
   _isConnected = true;
@@ -499,7 +504,7 @@ void PointToPointCommunication::requestConnection(std::string const &acceptorNam
   printLocalIndexCountStats(communicationMap);
 #endif
 
-  Event e4("m2n.createCommunications");
+  Event e4("m2n.createCommunications-req");
   e4.addData("Connections", communicationMap.size());
   if (communicationMap.empty()) {
     _isConnected = true;
@@ -517,7 +522,8 @@ void PointToPointCommunication::requestConnection(std::string const &acceptorNam
 
     PRECICE_DEBUG("Create and connect communication");
     _communication = _communicationFactory->newCommunication();
-  } // Request point-to-point connections (as client) between the current
+  }
+  // Request point-to-point connections (as client) between the current
   // requester process (in the current participant) and (multiple) acceptor
   // processes (in the acceptor participant) to ranks `accceptingRanks'
   // according to `communicationMap`.
