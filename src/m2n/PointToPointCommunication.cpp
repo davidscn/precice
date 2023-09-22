@@ -512,23 +512,30 @@ void PointToPointCommunication::requestConnection(std::string const &acceptorNam
   std::set<int> acceptingRanks;
   for (auto &i : communicationMap)
     acceptingRanks.emplace(i.first);
+  {
+    Event e5("m2n.createCommunications-newCommunication");
 
-  PRECICE_DEBUG("Create and connect communication");
-  _communication = _communicationFactory->newCommunication();
-  // Request point-to-point connections (as client) between the current
+    PRECICE_DEBUG("Create and connect communication");
+    _communication = _communicationFactory->newCommunication();
+  } // Request point-to-point connections (as client) between the current
   // requester process (in the current participant) and (multiple) acceptor
   // processes (in the acceptor participant) to ranks `accceptingRanks'
   // according to `communicationMap`.
-  _communication->requestConnectionAsClient(acceptorName, requesterName,
-                                            _mesh->getName(),
-                                            acceptingRanks, utils::IntraComm::getRank());
-
+  {
+    Event e6("m2n.createCommunications-requestCommunication");
+    _communication->requestConnectionAsClient(acceptorName, requesterName,
+                                              _mesh->getName(),
+                                              acceptingRanks, utils::IntraComm::getRank());
+  }
   PRECICE_DEBUG("Store communication map");
-  for (auto &i : communicationMap) {
-    auto globalAcceptorRank = i.first;
-    auto indices            = std::move(i.second);
+  {
+    Event e7("m2n.createCommunications-mapLoop");
+    for (auto &i : communicationMap) {
+      auto globalAcceptorRank = i.first;
+      auto indices            = std::move(i.second);
 
-    _mappings.push_back({globalAcceptorRank, std::move(indices), com::PtrRequest(), {}});
+      _mappings.push_back({globalAcceptorRank, std::move(indices), com::PtrRequest(), {}});
+    }
   }
   e4.stop();
   _isConnected = true;
