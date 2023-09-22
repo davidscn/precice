@@ -131,6 +131,7 @@ PartitionOfUnityMapping<RADIAL_BASIS_FUNCTION_T>::PartitionOfUnityMapping(
     : Mapping(constraint, dimension, false, Mapping::InitialGuessRequirement::None),
       _basisFunction(function), _verticesPerCluster(verticesPerCluster), _relativeOverlap(relativeOverlap), _projectToInput(projectToInput), _polynomial(polynomial)
 {
+  precice::profiling::Event e("map.pou.create.From" + input()->getName() + "To" + output()->getName(), profiling::Synchronize);
   PRECICE_ASSERT(this->getDimensions() <= 3);
   PRECICE_ASSERT(_polynomial != Polynomial::ON, "Integrated polynomial is not supported for partition of unity data mappings.");
   PRECICE_ASSERT(_relativeOverlap < 1, "The relative overlap has to be smaller than one.");
@@ -295,6 +296,8 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 void PartitionOfUnityMapping<RADIAL_BASIS_FUNCTION_T>::tagMeshFirstRound()
 {
   PRECICE_TRACE();
+  precice::profiling::Event e("map.pou.tagFirstRound.From" + input()->getName() + "To" + output()->getName(), profiling::Synchronize);
+
   mesh::PtrMesh filterMesh, outMesh;
   if (this->hasConstraint(Mapping::CONSERVATIVE)) {
     filterMesh = this->output(); // remote
