@@ -302,7 +302,8 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 void PartitionOfUnityMapping<RADIAL_BASIS_FUNCTION_T>::tagMeshFirstRound()
 {
   PRECICE_TRACE();
-  mesh::PtrMesh filterMesh, outMesh;
+  precice::profiling::Event e("map.pou.tagMeshFirstRound.From" + input()->getName() + "To" + output()->getName(), profiling::Synchronize);
+  mesh::PtrMesh             filterMesh, outMesh;
   if (this->hasConstraint(Mapping::CONSERVATIVE)) {
     filterMesh = this->output(); // remote
     outMesh    = this->input();  // local
