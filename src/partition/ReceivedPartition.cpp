@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <mpi.h>
+#include <numeric>
 #include <ostream>
 #include <utility>
 #include <vector>
@@ -435,19 +437,56 @@ void ReceivedPartition::compareBoundingBoxes()
     }
     PRECICE_ASSERT(_mesh->getConnectedRanks().empty());
     _mesh->setConnectedRanks(connectedRanks);
+    int connectedRanksSize = connectedRanks.size();
     if (not connectedRanks.empty()) {
-      connectionMap.emplace(0, std::move(connectedRanks));
+      connectionMap.emplace(0, connectedRanks);
       connectedRanksList.push_back(0);
     }
+    Event e7("compareBoundingBox7");
+    Event e7a("compareBoundingBox7a");
+    std::cout << "Bench1" << std::endl;
+    std::vector<int> gatheredSizes(utils::IntraComm::getSize());
+    MPI_Gather(&connectedRanksSize, 1, MPI_INT, gatheredSizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    // receive connected ranks from secondary ranks and add them to the connection map
-    for (int rank : utils::IntraComm::allSecondaryRanks()) {
-      std::vector<Rank> secondaryConnectedRanks = utils::IntraComm::getCommunication()->receiveRange(rank, com::AsVectorTag<Rank>{});
-      if (!secondaryConnectedRanks.empty()) {
-        connectedRanksList.push_back(rank);
-        connectionMap.emplace(rank, std::move(secondaryConnectedRanks));
-      }
+    int totalSize = std::accumulate(gatheredSizes.begin(), gatheredSizes.end(), static_cast<int>(0));
+
+    std::vector<int> displacements(gatheredSizes.size());
+    displacements[0] = 0;
+    for (int i = 1; i < displacements.size(); ++i) {
+      displacements[i] = displacements[i - 1] + gatheredSizes[i - 1];
     }
+    std::cout << "Bench2" << std::endl;
+
+    std::vector<Rank> gatheredVector(totalSize);
+    // Gather the vector data from all processes to the primary rank
+    MPI_Gatherv(connectedRanks.data(), connectedRanksSize, MPI_INT, gatheredVector.data(), gatheredSizes.data(), displacements.data(), MPI_INT, 0, MPI_COMM_WORLD);
+    e7.stop();
+    std::cout << "Bench3" << std::endl;
+
+    int startIndex = gatheredSizes[0];
+    for (std::size_t i = 1; i < gatheredSizes.size(); ++i) {
+      int              size = gatheredSizes[i];
+      std::vector<int> localSizes(size);
+      std::copy(gatheredVector.begin() + startIndex, gatheredVector.begin() + startIndex + size, localSizes.begin());
+
+      if (!localSizes.empty()) {
+        connectedRanksList.push_back(i);
+        connectionMap[i] = localSizes;
+      }
+      startIndex += size;
+    }
+    std::cout << "Bench4" << std::endl;
+
+    //TODO: Transform vector into map
+    // receive connected ranks from secondary ranks and add them to the connection map
+    // for (int rank : utils::IntraComm::allSecondaryRanks()) {
+    //   std::vector<Rank> secondaryConnectedRanks = utils::IntraComm::getCommunication()->receiveRange(rank, com::AsVectorTag<Rank>{});
+    //   if (!secondaryConnectedRanks.empty()) {
+    //     connectedRanksList.push_back(rank);
+    //     connectionMap[rank] = secondaryConnectedRanks;
+    //   }
+    // }
+    e7a.stop();
 
     // send connectionMap to other primary rank
     m2n().getPrimaryRankCommunication()->sendRange(connectedRanksList, 0);
@@ -468,9 +507,22 @@ void ReceivedPartition::compareBoundingBoxes()
     }
     PRECICE_ASSERT(_mesh->getConnectedRanks().empty());
     _mesh->setConnectedRanks(connectedRanks);
+    int connectedRanksSize = connectedRanks.size();
 
-    // send connected ranks to primary rank
-    utils::IntraComm::getCommunication()->sendRange(connectedRanks, 0);
+    std::vector<int> gatheredSizes;
+    std::vector<int> gatheredVector;
+    std::cout << "Bench54654" << std::endl;
+
+    MPI_Gather(&connectedRanksSize, 1, MPI_INT, gatheredSizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    std::cout << "Bench99999" << std::endl;
+
+    // Gather the vector data from all processes to the primary rank
+    MPI_Gatherv(connectedRanks.data(), connectedRanksSize, MPI_INT, nullptr, nullptr, nullptr, MPI_INT, 0, MPI_COMM_WORLD);
+    std::cout << "Bench999999999999999999999999999999" << std::endl;
+
+    // // send connected ranks to primary rank
+    // utils::IntraComm::getCommunication()->sendRange(connectedRanks, 0);
   }
 }
 
