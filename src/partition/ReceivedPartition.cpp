@@ -445,35 +445,32 @@ void ReceivedPartition::compareBoundingBoxes()
     Event e7("compareBoundingBox7");
     Event e7a("compareBoundingBox7a");
     std::cout << "Bench1" << std::endl;
-    std::vector<int> gatheredSizes(utils::IntraComm::getSize());
-    MPI_Gather(&connectedRanksSize, 1, MPI_INT, gatheredSizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // std::vector<int> gatheredSizes(utils::IntraComm::getSize());
 
-    int totalSize = std::accumulate(gatheredSizes.begin(), gatheredSizes.end(), static_cast<int>(0));
+    int maxLocalVectorSize;
+    MPI_Allreduce(&connectedRanksSize, &maxLocalVectorSize, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-    std::vector<int> displacements(gatheredSizes.size());
-    displacements[0] = 0;
-    for (int i = 1; i < displacements.size(); ++i) {
-      displacements[i] = displacements[i - 1] + gatheredSizes[i - 1];
-    }
-    std::cout << "Bench2" << std::endl;
+    // Pad the local vector to the maximum local vector size
+    connectedRanks.resize(maxLocalVectorSize, -1);
 
-    std::vector<Rank> gatheredVector(totalSize);
-    // Gather the vector data from all processes to the primary rank
-    MPI_Gatherv(connectedRanks.data(), connectedRanksSize, MPI_INT, gatheredVector.data(), gatheredSizes.data(), displacements.data(), MPI_INT, 0, MPI_COMM_WORLD);
+    std::vector<int> gatheredVector(maxLocalVectorSize * utils::IntraComm::getSize(), 0);
+
+    // Gather the padded vector data from all processes to the root process using MPI_Gather
+    MPI_Gather(connectedRanks.data(), maxLocalVectorSize, MPI_INT,
+               gatheredVector.data(), maxLocalVectorSize, MPI_INT, 0, MPI_COMM_WORLD);
+
     e7.stop();
     std::cout << "Bench3" << std::endl;
 
-    int startIndex = gatheredSizes[0];
-    for (std::size_t i = 1; i < gatheredSizes.size(); ++i) {
-      int              size = gatheredSizes[i];
-      std::vector<int> localSizes(size);
-      std::copy(gatheredVector.begin() + startIndex, gatheredVector.begin() + startIndex + size, localSizes.begin());
+    for (std::size_t i = 1; i < utils::IntraComm::getSize(); ++i) {
+      std::vector<int> localSizes;
+      int              startIndex = maxLocalVectorSize * i;
+      std::copy_if(gatheredVector.begin() + startIndex, gatheredVector.begin() + startIndex + maxLocalVectorSize, std::back_inserter(localSizes), [](auto v) { return v != -1; });
 
       if (!localSizes.empty()) {
         connectedRanksList.push_back(i);
         connectionMap[i] = localSizes;
       }
-      startIndex += size;
     }
     std::cout << "Bench4" << std::endl;
 
@@ -511,15 +508,17 @@ void ReceivedPartition::compareBoundingBoxes()
 
     std::vector<int> gatheredSizes;
     std::vector<int> gatheredVector;
-    std::cout << "Bench54654" << std::endl;
 
-    MPI_Gather(&connectedRanksSize, 1, MPI_INT, gatheredSizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // MPI_Gather(&connectedRanksSize, 1, MPI_INT, gatheredSizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+    int maxLocalVectorSize;
+    MPI_Allreduce(&connectedRanksSize, &maxLocalVectorSize, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    connectedRanks.resize(maxLocalVectorSize, -1);
 
-    std::cout << "Bench99999" << std::endl;
+    MPI_Gather(connectedRanks.data(), maxLocalVectorSize, MPI_INT,
+               gatheredVector.data(), maxLocalVectorSize, MPI_INT, 0, MPI_COMM_WORLD);
 
     // Gather the vector data from all processes to the primary rank
-    MPI_Gatherv(connectedRanks.data(), connectedRanksSize, MPI_INT, nullptr, nullptr, nullptr, MPI_INT, 0, MPI_COMM_WORLD);
-    std::cout << "Bench999999999999999999999999999999" << std::endl;
+    // MPI_Gatherv(connectedRanks.data(), connectedRanksSize, MPI_INT, nullptr, nullptr, nullptr, MPI_INT, 0, MPI_COMM_WORLD);
 
     // // send connected ranks to primary rank
     // utils::IntraComm::getCommunication()->sendRange(connectedRanks, 0);
