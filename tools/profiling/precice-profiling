@@ -518,7 +518,7 @@ def analyzeCommand(profilingfile, participant, event, outfile=None, unit="us"):
     else:
         ldf = df.lazy()
         rankAdvance = (
-            ldf.filter((pl.col("eid") == event) & (pl.col("rank") > 0))
+            ldf.filter((pl.col("eid").str.contains(event)))
             .groupby("rank")
             .agg(pl.col("dur").sum())
             .sort("dur")
@@ -528,7 +528,7 @@ def analyzeCommand(profilingfile, participant, event, outfile=None, unit="us"):
         maxSecRank = rankAdvance.select(pl.last("rank")).item()
 
         ranksToPrint = (
-            (0, minSecRank) if minSecRank == maxSecRank else (0, minSecRank, maxSecRank)
+            (minSecRank) if minSecRank == maxSecRank else (minSecRank, maxSecRank)
         )
         if len(ranksToPrint) == 2:
             print(
