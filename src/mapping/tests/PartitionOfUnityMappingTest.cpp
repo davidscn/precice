@@ -1125,19 +1125,19 @@ BOOST_AUTO_TEST_CASE(PartitionOfUnityMappingTests)
   perform2DTestConsistentMappingVector(consistentMap2DVector);
   mapping::PartitionOfUnityMapping<CompactPolynomialC6> consistentMap2DDeadAxis(Mapping::CONSISTENT, 2, mapping::CompactPolynomialC6(6), deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
   performTestConsistentMapDeadAxis(consistentMap2DDeadAxis, 2);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC6> consistentMap3DDeadAxis(Mapping::CONSISTENT, 3, mapping::CompactPolynomialC6(8), deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
+  mapping::PartitionOfUnityMapping<CompactPolynomialC6> consistentMap3DDeadAxis(Mapping::CONSISTENT, 3, mapping::CompactPolynomialC6(8), deadAxis, Polynomial::SEPARATE, 5, 0.265, false);
   performTestConsistentMapDeadAxis(consistentMap3DDeadAxis, 3);
   mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap2D(Mapping::CONSERVATIVE, 2, function, deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
   perform2DTestConservativeMapping(conservativeMap2D);
   mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap2DVector(Mapping::CONSERVATIVE, 2, function, deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
   perform2DTestConservativeMappingVector(conservativeMap2DVector);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> consistentMap3D(Mapping::CONSISTENT, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
+  mapping::PartitionOfUnityMapping<CompactPolynomialC0> consistentMap3D(Mapping::CONSISTENT, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.265, false);
   perform3DTestConsistentMapping(consistentMap3D);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> consistentMap3DVector(Mapping::CONSISTENT, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
+  mapping::PartitionOfUnityMapping<CompactPolynomialC0> consistentMap3DVector(Mapping::CONSISTENT, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.265, false);
   perform3DTestConsistentMappingVector(consistentMap3DVector);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3D(Mapping::CONSERVATIVE, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
+  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3D(Mapping::CONSERVATIVE, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.265, false);
   perform3DTestConservativeMapping(conservativeMap3D);
-  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3DVector(Mapping::CONSERVATIVE, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.4, false);
+  mapping::PartitionOfUnityMapping<CompactPolynomialC0> conservativeMap3DVector(Mapping::CONSERVATIVE, 3, function, deadAxis, Polynomial::SEPARATE, 5, 0.265, false);
   perform3DTestConservativeMappingVector(conservativeMap3DVector);
 }
 
