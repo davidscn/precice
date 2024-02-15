@@ -558,11 +558,11 @@ def analyzeCommand(profilingfile, participant, event, outfile=None, unit="us"):
             how="align",
         ).collect()
 
-    printWide(joined)
+    printWide(joined.sort("eid"))
 
     if outfile:
         print(f"Writing to {outfile}")
-        joined.write_csv(outfile)
+        joined.sort("eid").write_csv(outfile)
 
     return 0
 
