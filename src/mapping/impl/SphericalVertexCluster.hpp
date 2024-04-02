@@ -4,6 +4,7 @@
 
 #include <boost/container/flat_set.hpp>
 
+#include "profiling/Event.hpp"
 #include "mapping/RadialBasisFctSolver.hpp"
 #include "mapping/config/MappingConfiguration.hpp"
 #include "mapping/impl/BasisFunctions.hpp"
@@ -137,6 +138,7 @@ SphericalVertexCluster<RADIAL_BASIS_FUNCTION_T>::SphericalVertexCluster(
     : _center(center), _radius(radius), _polynomial(polynomial), _weightingFunction(radius)
 {
   PRECICE_TRACE(_center.getCoords(), _radius);
+  precice::profiling::Event eq("map.pou.computeMapping.queryVertices");
   // Disable integrated polynomial, as it might cause locally singular matrices
   PRECICE_ASSERT(_polynomial != Polynomial::ON, "Integrated polynomial is not supported for partition of unity data mappings.")
   PRECICE_ASSERT(static_cast<int>(deadAxis.size()) == inputMesh->getDimensions());
@@ -151,7 +153,7 @@ SphericalVertexCluster<RADIAL_BASIS_FUNCTION_T>::SphericalVertexCluster(
   // The IDs are sorted in the boost flat_set, hence, the function here has N log(N) complexity
   _inputIDs.insert(inIDs.begin(), inIDs.end());
   _outputIDs.insert(outIDs.begin(), outIDs.end());
-
+  eq.stop();
   // If the cluster is empty, we return immediately
   if (empty()) {
     return;
@@ -166,6 +168,7 @@ SphericalVertexCluster<RADIAL_BASIS_FUNCTION_T>::SphericalVertexCluster(
 
   // Construct the solver. Here, the constructor of the RadialBasisFctSolver computes already the decompositions etc, such that we can mark the
   // mapping in this cluster as computed (mostly for debugging purpose)
+  precice::profiling::Event e("map.pou.computeMapping.rbfSolver");
   _rbfSolver          = RadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>{function, *inputMesh.get(), _inputIDs, *outputMesh.get(), _outputIDs, deadAxis, _polynomial};
   _hasComputedMapping = true;
 }
