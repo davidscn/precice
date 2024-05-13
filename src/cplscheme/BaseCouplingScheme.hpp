@@ -403,6 +403,9 @@ protected:
   /// @copydoc cplscheme::CouplingScheme::implicitDataToReceive()
   ImplicitData implicitDataToReceive() const override;
 
+  /// @copydoc cplscheme::CouplingScheme::localParticipnat()
+  std::string localParticipant() const override final;
+
 private:
   /// Coupling mode used by coupling scheme.
   CouplingMode _couplingMode = Undefined;
