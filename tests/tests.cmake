@@ -110,6 +110,7 @@ target_sources(testprecice
     tests/serial/compositional/OneActivatedMuscle.cpp
     tests/serial/compositional/TwoActivatedMuscles.cpp
     tests/serial/compositional/data/Parallel.cpp
+    tests/serial/compositional/data/SerialFirst.cpp
     tests/serial/convergence-measures/helpers.cpp
     tests/serial/convergence-measures/helpers.hpp
     tests/serial/convergence-measures/testConvergenceMeasures1.cpp
