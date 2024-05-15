@@ -54,7 +54,7 @@ void NearestNeighborMapping::mapConservative(const time::Sample &inData, Eigen::
       const auto &v                 = input()->vertex(mapInputIndex).rawCoords();
       auto        u                 = output()->vertex(mapOutputIndex).rawCoords();
       double      squaredDifference = computeSquaredDifference(u, v);
-      auto        local_weight      = basis_function.evaluate(std::sqr(squaredDifference));
+      auto        local_weight      = basis_function.evaluate(std::sqrt(squaredDifference));
       weights[mapOutputIndex] += local_weight;
 
       outputValues(mapOutputIndex) += local_weight * inputValues(mapInputIndex);
