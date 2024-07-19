@@ -15,6 +15,7 @@
 #include "mapping/NearestNeighborGradientMapping.hpp"
 #include "mapping/NearestNeighborMapping.hpp"
 #include "mapping/NearestProjectionMapping.hpp"
+#include "mapping/PGreedySolver.hpp"
 #include "mapping/PartitionOfUnityMapping.hpp"
 #include "mapping/PetRadialBasisFctMapping.hpp"
 #include "mapping/RadialBasisFctMapping.hpp"
@@ -74,7 +75,7 @@ struct BackendSelector {
 // Specialization for the RBF Eigen backend
 template <typename RBF>
 struct BackendSelector<RBFBackend::Eigen, RBF> {
-  typedef mapping::RadialBasisFctMapping<RadialBasisFctSolver<RBF>> type;
+  typedef mapping::RadialBasisFctMapping<PGreedySolver<RBF>> type;
 };
 
 // Specialization for the PETSc RBF backend

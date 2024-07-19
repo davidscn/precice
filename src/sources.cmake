@@ -188,6 +188,7 @@ target_sources(preciceCore
     src/mapping/NearestNeighborMapping.hpp
     src/mapping/NearestProjectionMapping.cpp
     src/mapping/NearestProjectionMapping.hpp
+    src/mapping/PGreedySolver.hpp
     src/mapping/PartitionOfUnityMapping.hpp
     src/mapping/PetRadialBasisFctMapping.hpp
     src/mapping/Polation.cpp
