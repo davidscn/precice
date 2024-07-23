@@ -6,10 +6,10 @@
 #include <boost/range/adaptor/indexed.hpp>
 #include <boost/range/irange.hpp>
 #include <numeric>
+#include "io/ExportVTU.hpp"
 #include "mapping/config/MappingConfigurationTypes.hpp"
 #include "mesh/Mesh.hpp"
 #include "precice/impl/Types.hpp"
-
 namespace precice {
 namespace mapping {
 
@@ -57,7 +57,7 @@ private:
   Eigen::VectorXd                 predict(const mesh::Mesh::VertexContainer &vertices, RADIAL_BASIS_FUNCTION_T basisFunction);
 
   /// max iterations
-  const int _max_iter = 10000;
+  const int _max_iter = 100;
 
   /// n_randon
   const double _tol_p = 1e-12;
@@ -140,7 +140,6 @@ template <typename RADIAL_BASIS_FUNCTION_T, typename IndexContainer, typename Ve
 Eigen::MatrixXd buildKernelMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const VertexContainer &inputMesh, const IndexContainer &inputIDs,
                                   VertexContainer &outputMesh, const IndexContainer outputIDs, std::array<bool, 3> activeAxis, Polynomial polynomial)
 {
-  std::cout << "Building kernel matrix:..." << std::endl;
   // Treat the 2D case as 3D case with dead axis
   const unsigned int deadDimensions = std::count(activeAxis.begin(), activeAxis.end(), false);
   const unsigned int dimensions     = 3;
@@ -177,11 +176,15 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::predict(const mesh::Mesh
   // First compute the diagonal entries
   // n = size of the centers
   if (!_centers.empty()) {
+    // p = self.kernel.diagonal(X) - np.sum((self.kernel.eval(X, np.atleast_2d(self.ctrs_)[:n]) @ self.Cut_[:n, :n].transpose()) ** 2, axis=1)
     auto n = _centers.size();
     // now compute (requires adjustment of the function) and only a portion of this matrix is required
-    Eigen::MatrixXd kernel_eval = buildKernelMatrix(basisFunction, vertices, boost::irange<Eigen::Index>(0, n), _centers, boost::irange<Eigen::Index>(0, n), {{true, true, true}}, Polynomial::OFF);
-    Eigen::VectorXd result      = (kernel_eval * _cut.block(0, 0, n, n).transpose()).array().square().rowwise().sum();
+    Eigen::MatrixXd kernel_eval = buildKernelMatrix(basisFunction, vertices, boost::irange<Eigen::Index>(0, vertices.size()), _centers, boost::irange<Eigen::Index>(0, n), {{true, true, true}}, Polynomial::OFF);
+    // std::cout << "Kernel evaluation in prediction.." << kernel_eval.transpose().rows() << "  " << kernel_eval.transpose().cols() << ">>>" << _cut.block(0, 0, n, n).transpose().rows() << std::endl;
+    Eigen::VectorXd result = (kernel_eval.transpose() * _cut.block(0, 0, n, n).transpose()).array().square().rowwise().sum();
+    // std::cout << "result evaluation in prediction.." << std::endl;
     p -= result;
+    // std::cout << "p -= result;.." << std::endl;
   }
   //        # Otherwise check if everything is ok
   //        # Check is fit has been called
@@ -221,20 +224,19 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
   // Iterative selection of new points
   for (int n = 0; n < _max_iter; ++n) {
-
+    std::cout << "Iteration: " << n << std::endl;
     // Select the current point
-    std::cout << "Applying selection rule: ..." << std::endl;
     auto [x, pMax] = selectionRule(inputMesh, basisFunction);
 
+    std::cout << "pMax: " << pMax << std::endl;
     if (pMax < _tol_p) {
       break;
     }
 
     // Evaluate the first (n-1) bases on the selected point
-    std::cout << "Computing Vx: ..." << std::endl;
     Eigen::MatrixXd Vx;
     if (n > 0) {
-      Vx = buildKernelMatrix(basisFunction, inputMesh.vertices(), boost::irange<Eigen::Index>(0, inputMesh.vertices().size()), _centers, boost::irange<Eigen::Index>(0, n), {{true, true, true}}, Polynomial::OFF) *
+      Vx = buildKernelMatrix(basisFunction, mesh::Mesh::VertexContainer{x}, boost::irange<Eigen::Index>(0, 1), _centers, boost::irange<Eigen::Index>(0, n), {{true, true, true}}, Polynomial::OFF).transpose() *
            _cut.block(0, 0, n, n).transpose();
     }
 
@@ -257,8 +259,13 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
     _cut.row(n) = new_row / std::sqrt(pMax);
     _centers.push_back(x);
-    std::cout << "Number of centers: " << _centers.size() << std::endl;
   }
+
+  // If the mesh creation is shifted into the loop (centerMesh.vertices()), one could visualize the distribution of pMax
+  mesh::Mesh centerMesh("greedy-centers", inputMesh.getDimensions(), mesh::Mesh::MESH_ID_UNDEFINED);
+  centerMesh.vertices() = _centers;
+  io::ExportVTU exporter{"PGreedy", "exports", centerMesh, io::Export::ExportKind::TimeWindows, 1, /*Rank*/ 0, /*size*/ 1};
+  exporter.doExport(0, 0.0);
   // First, assemble the interpolation matrix and check the invertability
   // bool decompositionSuccessful = false;
   // if constexpr (RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite()) {
