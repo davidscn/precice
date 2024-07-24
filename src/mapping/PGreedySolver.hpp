@@ -14,7 +14,29 @@ namespace precice {
 namespace mapping {
 
 /**
- * VKOGA PGreedy algorithm
+ * VKOGA PGreedy algorithm: reimplemented the PGreedy solver as found in
+ * https://github.com/GabrieleSantin/VKOGA/blob/master/src/vkoga/pgreedy.py
+ *
+ * As opposed to the original example in VKOGA, our setup is slightly different in terms of when to compute what:
+ *
+ * Nomenclature:
+ * Original: X -> our case: input mesh vertices, i.e.,
+ * the vertices in two or three dimensional space on which we have data given and on which we want to build an interpolant
+ * Original: Y -> our case: input data, i.e., the coupling data associated to the input mesh vertices
+ * Original: X_test -> our case: output mesh vertices, i.e., the vertices (2d or 3d) on which we need to evaluate the interpolant
+ * Original: Y_test -> our case: output mesh data, i.e., the unknown data values we want to evaluate, associated to the output mesh vertices
+ *
+ * In the original case, we typically have initially given: X and Y, such that we have two main stages:
+ *
+ * 1. PGreedy(params) and PGreedy.fit(X, y), which creates the reduced model
+ * 2. PGreedy.predict(X_test), which evaluates the fit on the test data
+ *
+ * In our case, we typically have initially given: X and X_test, such that we have two (different) main stages:
+ *
+ * 1. PGreedy(params, X, X_test), which computes the centers and associated data structures (_cut and greedyIDs)
+ * 2. PGreedy.solveConsistent(y), which evaluates the model for new data
+ *
+ * When an object is created, we compute the centers, the solveConsistent evaluates the center fit for new data.
  */
 template <typename RADIAL_BASIS_FUNCTION_T>
 class PGreedySolver {
@@ -25,11 +47,7 @@ public:
   PGreedySolver() = default;
 
   /**
-   * assembles the system matrices and computes the decomposition of the interpolation matrix
-   * inputMesh refers to the mesh where the interpolants are built on, i.e., the input mesh
-   * for consistent mappings and the output mesh for conservative mappings
-   * outputMesh refers to the mesh where we evaluate the interpolants, i.e., the output mesh
-   * consistent mappings and the input mesh for conservative mappings
+   * computes the greedy centers and stores data structures to later on evaluate the reduced model
   */
   template <typename IndexContainer>
   PGreedySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
@@ -53,35 +71,26 @@ public:
 private:
   precice::logging::Logger _log{"mapping::PGreedySolver"};
 
-  std::pair<mesh::Vertex, double> selectionRule(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction);
-  Eigen::VectorXd                 predict(const mesh::Mesh::VertexContainer &vertices, RADIAL_BASIS_FUNCTION_T basisFunction);
+  std::pair<int, double> selectionRule(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction);
+  Eigen::VectorXd        predict(const mesh::Mesh::VertexContainer &vertices, RADIAL_BASIS_FUNCTION_T basisFunction);
 
   /// max iterations
   const int _max_iter = 100;
 
   /// n_randon
-  const double _tol_p = 1e-12;
+  const double _tol_p = 1e-10;
 
   /// the selected centers
   mesh::Mesh::VertexContainer _centers;
 
-  ///
+  /// c upper triangular
   Eigen::MatrixXd _cut;
 
-  /// Decomposition of the interpolation matrix
-  DecompositionType _decMatrixC;
+  std::vector<int> _greedyIDs;
 
-  /// Decomposition of the polynomial (for separate polynomial)
-  Eigen::ColPivHouseholderQR<Eigen::MatrixXd> _qrMatrixQ;
-
-  /// Polynomial matrix of the input mesh (for separate polynomial)
-  Eigen::MatrixXd _matrixQ;
-
-  /// Polynomial matrix of the output mesh (for separate polynomial)
-  Eigen::MatrixXd _matrixV;
-
-  /// Evaluation matrix (output x input)
-  Eigen::MatrixXd _matrixA;
+  Eigen::Index    _inSize  = 0;
+  Eigen::Index    _outSize = 0;
+  Eigen::MatrixXd _kernel_eval;
 };
 
 // ------- Non-Member Functions ---------
@@ -99,42 +108,6 @@ inline double computeSquaredDifference2(
   // @todo: this can be replaced by std::hypot when moving to C++17
   return std::accumulate(v.begin(), v.end(), static_cast<double>(0.), [](auto &res, auto &val) { return res + val * val; });
 }
-
-// template <typename RADIAL_BASIS_FUNCTION_T, typename IndexContainer>
-// Eigen::MatrixXd buildMatrixCLU(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
-//                                std::array<bool, 3> activeAxis, Polynomial polynomial)
-// {
-//   // Treat the 2D case as 3D case with dead axis
-//   const unsigned int deadDimensions = std::count(activeAxis.begin(), activeAxis.end(), false);
-//   const unsigned int dimensions     = 3;
-//   const unsigned int polyparams     = polynomial == Polynomial::ON ? 1 + dimensions - deadDimensions : 0;
-
-//   // Add linear polynom degrees if polynomial requires this
-//   const auto inputSize = inputIDs.size();
-//   const auto n         = inputSize + polyparams;
-
-//   PRECICE_ASSERT((inputMesh.getDimensions() == 3) || activeAxis[2] == false);
-//   PRECICE_ASSERT((inputSize >= 1 + polyparams) || polynomial != Polynomial::ON, inputSize);
-
-//   Eigen::MatrixXd matrixCLU(n, n);
-
-//   // Compute RBF matrix entries
-//   auto         i_iter  = inputIDs.begin();
-//   Eigen::Index i_index = 0;
-//   for (; i_iter != inputIDs.end(); ++i_iter, ++i_index) {
-//     const auto &u       = inputMesh.vertex(*i_iter).rawCoords();
-//     auto        j_iter  = i_iter;
-//     auto        j_index = i_index;
-//     for (; j_iter != inputIDs.end(); ++j_iter, ++j_index) {
-//       const auto &v                 = inputMesh.vertex(*j_iter).rawCoords();
-//       double      squaredDifference = computeSquaredDifference2(u, v, activeAxis);
-//       matrixCLU(i_index, j_index)   = basisFunction.evaluate(std::sqrt(squaredDifference));
-//     }
-//   }
-
-//   matrixCLU.triangularView<Eigen::Lower>() = matrixCLU.transpose();
-//   return matrixCLU;
-// }
 
 template <typename RADIAL_BASIS_FUNCTION_T, typename IndexContainer, typename VertexContainer>
 Eigen::MatrixXd buildKernelMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const VertexContainer &inputMesh, const IndexContainer &inputIDs,
@@ -176,40 +149,24 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::predict(const mesh::Mesh
   // First compute the diagonal entries
   // n = size of the centers
   if (!_centers.empty()) {
-    // p = self.kernel.diagonal(X) - np.sum((self.kernel.eval(X, np.atleast_2d(self.ctrs_)[:n]) @ self.Cut_[:n, :n].transpose()) ** 2, axis=1)
     auto n = _centers.size();
     // now compute (requires adjustment of the function) and only a portion of this matrix is required
     Eigen::MatrixXd kernel_eval = buildKernelMatrix(basisFunction, vertices, boost::irange<Eigen::Index>(0, vertices.size()), _centers, boost::irange<Eigen::Index>(0, n), {{true, true, true}}, Polynomial::OFF);
-    // std::cout << "Kernel evaluation in prediction.." << kernel_eval.transpose().rows() << "  " << kernel_eval.transpose().cols() << ">>>" << _cut.block(0, 0, n, n).transpose().rows() << std::endl;
-    Eigen::VectorXd result = (kernel_eval.transpose() * _cut.block(0, 0, n, n).transpose()).array().square().rowwise().sum();
-    // std::cout << "result evaluation in prediction.." << std::endl;
+    Eigen::VectorXd result      = (kernel_eval.transpose() * _cut.block(0, 0, n, n).transpose()).array().square().rowwise().sum();
     p -= result;
-    // std::cout << "p -= result;.." << std::endl;
   }
-  //        # Otherwise check if everything is ok
-  //        # Check is fit has been called
-  //        check_is_fitted(self, 'ctrs_')
-  //        # Validate the input
-  //        X = check_array(X)
-  //
-  //        # Decide how many centers to use
-  //        if n is None:
-  //            n = np.atleast_2d(self.ctrs_).shape[0]
-  //
-  //        # Evaluate the power function on the input
-  //  p = self.kernel.diagonal(X) - np.sum((self.kernel.eval(X, np.atleast_2d(self.ctrs_)[:n]) @ self.Cut_[:n, :n].transpose()) ** 2, axis=1)
   return p;
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-std::pair<mesh::Vertex, double> PGreedySolver<RADIAL_BASIS_FUNCTION_T>::selectionRule(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction)
+std::pair<int, double> PGreedySolver<RADIAL_BASIS_FUNCTION_T>::selectionRule(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction)
 {
   // Sample is here just our input distribution
   Eigen::VectorXd p_X = predict(inputMesh.vertices(), basisFunction);
   Eigen::Index    maxIndex;
   double          maxValue = p_X.maxCoeff(&maxIndex);
 
-  return {inputMesh.vertices().at(maxIndex), maxValue};
+  return {maxIndex, maxValue};
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
@@ -218,16 +175,26 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
                                                       const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial)
 {
   PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
+  PRECICE_ASSERT(_centers.empty());
+  PRECICE_ASSERT(_greedyIDs.empty());
+  PRECICE_ASSERT(_cut.size() == 0);
+  PRECICE_ASSERT(_kernel_eval.size() == 0);
+
+  _inSize  = inputMesh.vertices().size();
+  _outSize = outputMesh.vertices().size();
+
   // Convert dead axis vector into an active axis array so that we can handle the reduction more easily
   std::array<bool, 3> activeAxis({{false, false, false}});
   std::transform(deadAxis.begin(), deadAxis.end(), activeAxis.begin(), [](const auto ax) { return !ax; });
 
   // Iterative selection of new points
   for (int n = 0; n < _max_iter; ++n) {
-    std::cout << "Iteration: " << n << std::endl;
     // Select the current point
-    auto [x, pMax] = selectionRule(inputMesh, basisFunction);
+    auto [ind, pMax] = selectionRule(inputMesh, basisFunction);
 
+    auto x = inputMesh.vertices().at(ind);
+
+    std::cout << "Iteration: " << n << std::endl;
     std::cout << "pMax: " << pMax << std::endl;
     if (pMax < _tol_p) {
       break;
@@ -258,6 +225,7 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
     }
 
     _cut.row(n) = new_row / std::sqrt(pMax);
+    _greedyIDs.push_back(ind);
     _centers.push_back(x);
   }
 
@@ -266,131 +234,54 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
   centerMesh.vertices() = _centers;
   io::ExportVTU exporter{"PGreedy", "exports", centerMesh, io::Export::ExportKind::TimeWindows, 1, /*Rank*/ 0, /*size*/ 1};
   exporter.doExport(0, 0.0);
-  // First, assemble the interpolation matrix and check the invertability
-  // bool decompositionSuccessful = false;
-  // if constexpr (RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite()) {
-  //   _decMatrixC             = buildMatrixCLU(basisFunction, inputMesh, inputIDs, activeAxis, polynomial).llt();
-  //   decompositionSuccessful = _decMatrixC.info() == Eigen::ComputationInfo::Success;
-  // } else {
-  //   _decMatrixC             = buildMatrixCLU(basisFunction, inputMesh, inputIDs, activeAxis, polynomial).colPivHouseholderQr();
-  //   decompositionSuccessful = _decMatrixC.isInvertible();
-  // }
 
-  // PRECICE_CHECK(decompositionSuccessful,
-  //               "The interpolation matrix of the RBF mapping from mesh \"{}\" to mesh \"{}\" is not invertable. "
-  //               "This means that the mapping problem is not well-posed. "
-  //               "Please check if your coupling meshes are correct (e.g. no vertices are duplicated) or reconfigure "
-  //               "your basis-function (e.g. reduce the support-radius).",
-  //               inputMesh.getName(), outputMesh.getName());
-
-  // Second, assemble evaluation matrix
-  // _matrixA = buildKernelMatrix(basisFunction, inputMesh, inputIDs, outputMesh, outputIDs, activeAxis, polynomial);
-
-  // In case we deal with separated polynomials, we need dedicated matrices for the polynomial contribution
-  // if (polynomial == Polynomial::SEPARATE) {
-
-  //   // 4 = 1 + dimensions(3) = maximum number of polynomial parameters
-  //   auto         localActiveAxis = activeAxis;
-  //   unsigned int polyParams      = 4 - std::count(localActiveAxis.begin(), localActiveAxis.end(), false);
-
-  //   do {
-  //     // First, build matrix Q and check for the condition number
-  //     _matrixQ.resize(inputIDs.size(), polyParams);
-  //     fillPolynomialEntries(_matrixQ, inputMesh, inputIDs, 0, localActiveAxis);
-
-  //     // Compute the condition number
-  //     Eigen::JacobiSVD<Eigen::MatrixXd> svd(_matrixQ);
-  //     PRECICE_ASSERT(svd.singularValues().size() > 0);
-  //     PRECICE_DEBUG("Singular values in polynomial solver: {}", svd.singularValues());
-  //     const double conditionNumber = svd.singularValues()(0) / std::max(svd.singularValues()(svd.singularValues().size() - 1), math::NUMERICAL_ZERO_DIFFERENCE);
-  //     PRECICE_DEBUG("Condition number: {}", conditionNumber);
-
-  //     // Disable one axis
-  //     if (conditionNumber > 1e5) {
-  //       reduceActiveAxis(inputMesh, inputIDs, localActiveAxis);
-  //       polyParams = 4 - std::count(localActiveAxis.begin(), localActiveAxis.end(), false);
-  //     } else {
-  //       break;
-  //     }
-  //   } while (true);
-
-  //   // allocate and fill matrix V for the outputMesh
-  //   _matrixV.resize(outputIDs.size(), polyParams);
-  //   fillPolynomialEntries(_matrixV, outputMesh, outputIDs, 0, localActiveAxis);
-
-  //   // 3. compute decomposition
-  //   _qrMatrixQ = _matrixQ.colPivHouseholderQr();
-  // }
+  // now compute (requires adjustment of the function) and only a portion of this matrix is required
+  _kernel_eval = buildKernelMatrix(basisFunction, outputMesh.vertices(), boost::irange<Eigen::Index>(0, outputMesh.vertices().size()), _centers, boost::irange<Eigen::Index>(0, _centers.size()), {{true, true, true}}, Polynomial::OFF);
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const
 {
-  PRECICE_ASSERT((_matrixV.size() > 0 && polynomial == Polynomial::SEPARATE) || _matrixV.size() == 0, _matrixV.size());
-  // TODO: Avoid temporary allocations
-  // Au is equal to the eta in our PETSc implementation
-  PRECICE_ASSERT(inputData.size() == _matrixA.rows());
-  Eigen::VectorXd Au = _matrixA.transpose() * inputData;
-  PRECICE_ASSERT(Au.size() == _matrixA.cols());
-
-  // mu in the PETSc implementation
-  Eigen::VectorXd out = _decMatrixC.solve(Au);
-
-  if (polynomial == Polynomial::SEPARATE) {
-    Eigen::VectorXd epsilon = _matrixV.transpose() * inputData;
-    PRECICE_ASSERT(epsilon.size() == _matrixV.cols());
-
-    // epsilon = Q^T * mu - epsilon (tau in the PETSc impl)
-    epsilon -= _matrixQ.transpose() * out;
-    PRECICE_ASSERT(epsilon.size() == _matrixQ.cols());
-
-    // out  = out - solveTranspose tau (sigma in the PETSc impl)
-    out -= static_cast<Eigen::VectorXd>(_qrMatrixQ.transpose().solve(-epsilon));
-  }
-  return out;
+  // Not implemented
+  PRECICE_ASSERT(false);
+  return Eigen::VectorXd();
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const
 {
-  PRECICE_ASSERT((_matrixQ.size() > 0 && polynomial == Polynomial::SEPARATE) || _matrixQ.size() == 0);
-  Eigen::VectorXd polynomialContribution;
-  // Solve polynomial QR and subtract it from the input data
-  if (polynomial == Polynomial::SEPARATE) {
-    polynomialContribution = _qrMatrixQ.solve(inputData);
-    inputData -= (_matrixQ * polynomialContribution);
-  }
 
-  // Integrated polynomial (and separated)
-  PRECICE_ASSERT(inputData.size() == _matrixA.cols());
-  Eigen::VectorXd p = _decMatrixC.solve(inputData);
-  PRECICE_ASSERT(p.size() == _matrixA.cols());
-  Eigen::VectorXd out = _matrixA * p;
+  // First, compute the c vector
+  // see https://eigen.tuxfamily.org/dox/group__TutorialSlicingIndexing.html
+  Eigen::VectorXd c = inputData(_greedyIDs);
 
-  // Add the polynomial part again for separated polynomial
-  if (polynomial == Polynomial::SEPARATE) {
-    out += (_matrixV * polynomialContribution);
-  }
-  return out;
+  Eigen::VectorXd coeff      = _cut.triangularView<Eigen::Lower>().transpose() * _cut * c;
+  Eigen::VectorXd prediction = _kernel_eval.transpose() * coeff;
+
+  return prediction;
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::clear()
 {
-  _matrixA    = Eigen::MatrixXd();
-  _decMatrixC = DecompositionType();
+  _centers.clear();
+  _greedyIDs.clear();
+  _cut         = Eigen::MatrixXd();
+  _kernel_eval = Eigen::MatrixXd();
+  _inSize      = 0;
+  _outSize     = 0;
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::Index PGreedySolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const
 {
-  return _matrixA.cols();
+  return _inSize;
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::Index PGreedySolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const
 {
-  return _matrixA.rows();
+  return _outSize;
 }
 } // namespace mapping
 } // namespace precice
