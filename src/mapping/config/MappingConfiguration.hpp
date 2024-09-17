@@ -83,7 +83,8 @@ public:
     enum struct SystemSolver {
       GlobalDirect,
       GlobalIterative,
-      PUMDirect
+      PUMDirect,
+      Greedy
     };
     SystemSolver        solver{};
     std::array<bool, 3> deadAxis{};
@@ -132,6 +133,7 @@ private:
   const std::string TYPE_LINEAR_CELL_INTERPOLATION   = "linear-cell-interpolation";
   const std::string TYPE_RBF_GLOBAL_DIRECT           = "rbf-global-direct";
   const std::string TYPE_RBF_GLOBAL_ITERATIVE        = "rbf-global-iterative";
+  const std::string TYPE_RBF_GREEDY                  = "rbf-greedy"; // TODO: Geedy-Typ String Definition
   const std::string TYPE_RBF_PUM_DIRECT              = "rbf-pum-direct";
   const std::string TYPE_RBF_ALIAS                   = "rbf";
   const std::string TYPE_AXIAL_GEOMETRIC_MULTISCALE  = "axial-geometric-multiscale";
