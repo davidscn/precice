@@ -114,7 +114,7 @@ Eigen::MatrixXd buildKernelMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const V
                                   VertexContainer &outputMesh, const IndexContainer outputIDs, std::array<bool, 3> activeAxis, Polynomial polynomial)
 {
   // Treat the 2D case as 3D case with dead axis
-  const unsigned int deadDimensions = std::count(activeAxis.begin(), activeAxis.end(), false);
+  const unsigned int deadDimensions = std::count(activeAxis.begin(), activeAxis.end(), false); // irrelevant for Greedy Methods? Polynomial = OFF!
   const unsigned int dimensions     = 3;
   const unsigned int polyparams     = polynomial == Polynomial::ON ? 1 + dimensions - deadDimensions : 0;
 
@@ -151,8 +151,16 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::predict(const mesh::Mesh
   if (!_centers.empty()) {
     auto n = _centers.size();
     // now compute (requires adjustment of the function) and only a portion of this matrix is required
-    Eigen::MatrixXd kernel_eval = buildKernelMatrix(basisFunction, vertices, boost::irange<Eigen::Index>(0, vertices.size()), _centers, boost::irange<Eigen::Index>(0, n), {{true, true, true}}, Polynomial::OFF);
-    Eigen::VectorXd result      = (kernel_eval.transpose() * _cut.block(0, 0, n, n).transpose()).array().square().rowwise().sum();
+    Eigen::MatrixXd kernel_eval = buildKernelMatrix(
+                                  basisFunction, 
+                                  vertices, 
+                                  boost::irange<Eigen::Index>(0, vertices.size()), 
+                                  _centers, 
+                                  boost::irange<Eigen::Index>(0, n), 
+                                  {{true, true, true}}, 
+                                  Polynomial::OFF
+                                ); // K(vertices, _centers)
+    Eigen::VectorXd result      = (kernel_eval.transpose() * _cut.block(0, 0, n, n).transpose()).array().square().rowwise().sum(); // complete recalculation not necessary
     p -= result;
   }
   return p;
@@ -194,8 +202,6 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
     auto x = inputMesh.vertices().at(ind);
 
-    std::cout << "Iteration: " << n << std::endl;
-    std::cout << "pMax: " << pMax << std::endl;
     if (pMax < _tol_p) {
       break;
     }
@@ -203,8 +209,14 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
     // Evaluate the first (n-1) bases on the selected point
     Eigen::MatrixXd Vx;
     if (n > 0) {
-      Vx = buildKernelMatrix(basisFunction, mesh::Mesh::VertexContainer{x}, boost::irange<Eigen::Index>(0, 1), _centers, boost::irange<Eigen::Index>(0, n), {{true, true, true}}, Polynomial::OFF).transpose() *
-           _cut.block(0, 0, n, n).transpose();
+      Vx = buildKernelMatrix(
+            basisFunction, 
+            mesh::Mesh::VertexContainer{x},       // in Mesh
+            boost::irange<Eigen::Index>(0, 1),    // in ID: {0}
+            _centers,                             // out Mesh
+            boost::irange<Eigen::Index>(0, n),    // out ID: {0,...,n-1}
+            {{true, true, true}}, Polynomial::OFF // dead Axis and Poly=OFF
+          ).transpose() * _cut.block(0, 0, n, n).transpose();
     }
 
     // Step 1: Append a column of zeros to the right of Cut_
@@ -236,7 +248,15 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
   exporter.doExport(0, 0.0);
 
   // now compute (requires adjustment of the function) and only a portion of this matrix is required
-  _kernel_eval = buildKernelMatrix(basisFunction, outputMesh.vertices(), boost::irange<Eigen::Index>(0, outputMesh.vertices().size()), _centers, boost::irange<Eigen::Index>(0, _centers.size()), {{true, true, true}}, Polynomial::OFF);
+  _kernel_eval = buildKernelMatrix(
+                  basisFunction, 
+                  outputMesh.vertices(),
+                  boost::irange<Eigen::Index>(0, outputMesh.vertices().size()),
+                  _centers,
+                  boost::irange<Eigen::Index>(0, _centers.size()), 
+                  {{true, true, true}}, 
+                  Polynomial::OFF
+                ); // = K(outputMesh, _centers) 
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
