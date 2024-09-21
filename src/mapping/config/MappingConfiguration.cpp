@@ -82,7 +82,7 @@ struct BackendSelector<RBFBackend::EigenGreedy, RBF> {
 
 template <typename RBF>
 struct BackendSelector<RBFBackend::Eigen, RBF> {
-  typedef mapping::RadialBasisFctMapping<PGreedySolver<RBF>> type;
+  typedef mapping::RadialBasisFctMapping<RadialBasisFctSolver<RBF>> type;
 };
 
 // Specialization for the PETSc RBF backend
