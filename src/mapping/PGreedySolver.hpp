@@ -53,6 +53,8 @@ public:
   PGreedySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
                 const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial);
 
+  void updatePowerFunction();
+
   /// Maps the given input data
   Eigen::VectorXd solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const;
 
@@ -72,10 +74,11 @@ private:
   precice::logging::Logger _log{"mapping::PGreedySolver"};
 
   std::pair<int, double> selectionRule(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction);
+  std::pair<int, double> selectionRuleNew(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction);
   Eigen::VectorXd        predict(const mesh::Mesh::VertexContainer &vertices, RADIAL_BASIS_FUNCTION_T basisFunction);
 
   /// max iterations
-  const int _max_iter = 100;
+  const int _max_iter = 200;
 
   /// n_randon
   const double _tol_p = 1e-10;
@@ -91,6 +94,9 @@ private:
   Eigen::Index    _inSize  = 0;
   Eigen::Index    _outSize = 0;
   Eigen::MatrixXd _kernel_eval;
+
+  Eigen::MatrixXd _V;
+  Eigen::VectorXd _powerFunction;
 };
 
 // ------- Non-Member Functions ---------
@@ -111,7 +117,7 @@ inline double computeSquaredDifference2(
 
 template <typename RADIAL_BASIS_FUNCTION_T, typename IndexContainer, typename VertexContainer>
 Eigen::MatrixXd buildKernelMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const VertexContainer &inputMesh, const IndexContainer &inputIDs,
-                                  VertexContainer &outputMesh, const IndexContainer outputIDs, std::array<bool, 3> activeAxis, Polynomial polynomial)
+                                  const VertexContainer &outputMesh, const IndexContainer &outputIDs, std::array<bool, 3> activeAxis, Polynomial polynomial)
 {
   // Treat the 2D case as 3D case with dead axis
   const unsigned int deadDimensions = std::count(activeAxis.begin(), activeAxis.end(), false); // irrelevant for Greedy Methods? Polynomial = OFF!
@@ -159,12 +165,13 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::predict(const mesh::Mesh
                                   boost::irange<Eigen::Index>(0, n), 
                                   {{true, true, true}}, 
                                   Polynomial::OFF
-                                ); // K(vertices, _centers)
+                                ); // K(inputMesh.vertices(), _centers)
     Eigen::VectorXd result      = (kernel_eval.transpose() * _cut.block(0, 0, n, n).transpose()).array().square().rowwise().sum(); // complete recalculation not necessary
     p -= result;
   }
   return p;
 }
+
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 std::pair<int, double> PGreedySolver<RADIAL_BASIS_FUNCTION_T>::selectionRule(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction)
@@ -176,6 +183,20 @@ std::pair<int, double> PGreedySolver<RADIAL_BASIS_FUNCTION_T>::selectionRule(con
 
   return {maxIndex, maxValue};
 }
+
+
+template <typename RADIAL_BASIS_FUNCTION_T>
+std::pair<int, double> PGreedySolver<RADIAL_BASIS_FUNCTION_T>::selectionRuleNew(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction)
+{
+  // Sample is here just our input distribution
+  Eigen::Index    maxIndex;
+  double          maxValue = _powerFunction.maxCoeff(&maxIndex);
+
+  return {maxIndex, maxValue};
+}
+
+
+//TODO: SOLVER
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 template <typename IndexContainer>
@@ -190,10 +211,16 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
   _inSize  = inputMesh.vertices().size();
   _outSize = outputMesh.vertices().size();
+  _powerFunction = Eigen::VectorXd(_inSize);
+  _powerFunction.fill(basisFunction.evaluate(0));
+  _V = Eigen::MatrixXd::Zero(_inSize, _max_iter);
+  _cut = Eigen::MatrixXd::Zero(_max_iter, _max_iter);
 
   // Convert dead axis vector into an active axis array so that we can handle the reduction more easily
   std::array<bool, 3> activeAxis({{false, false, false}});
   std::transform(deadAxis.begin(), deadAxis.end(), activeAxis.begin(), [](const auto ax) { return !ax; });
+
+  std::cout << "Größe: ein =  " << _inSize << ", aus = " << _outSize << "\n";
 
   // Iterative selection of new points
   for (int n = 0; n < _max_iter; ++n) {
@@ -201,43 +228,74 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
     auto [ind, pMax] = selectionRule(inputMesh, basisFunction);
 
     auto x = inputMesh.vertices().at(ind);
+    _greedyIDs.push_back(ind);
 
     if (pMax < _tol_p) {
       break;
     }
+    std::cout << "  " << n << ": p = " << pMax << " (i=" << ind << ")" << " > " << _tol_p << "\n";
 
-    // Evaluate the first (n-1) bases on the selected point
-    Eigen::MatrixXd Vx;
-    if (n > 0) {
-      Vx = buildKernelMatrix(
+    //neu::
+
+    Eigen::VectorXd v = buildKernelMatrix(
             basisFunction, 
-            mesh::Mesh::VertexContainer{x},       // in Mesh
-            boost::irange<Eigen::Index>(0, 1),    // in ID: {0}
-            _centers,                             // out Mesh
-            boost::irange<Eigen::Index>(0, n),    // out ID: {0,...,n-1}
-            {{true, true, true}}, Polynomial::OFF // dead Axis and Poly=OFF
-          ).transpose() * _cut.block(0, 0, n, n).transpose();
-    }
+            mesh::Mesh::VertexContainer{x},
+            boost::irange<Eigen::Index>(0, 1),
+            inputMesh.vertices(),
+            boost::irange<Eigen::Index>(0, _inSize),
+            {{true, true, true}}, 
+            Polynomial::OFF
+          );
 
-    // Step 1: Append a column of zeros to the right of Cut_
-    Eigen::MatrixXd cut_with_col                       = Eigen::MatrixXd::Zero(_cut.rows(), _cut.cols() + 1);
-    cut_with_col.block(0, 0, _cut.rows(), _cut.cols()) = _cut;
+    v -= _V * _V.block(ind, 0, 1, _max_iter).transpose();
+    v /= std::sqrt(pMax); // v = [v_n(x_1), ..., v_n(x_N)]^T (N = _inSize)
+    _powerFunction -= (Eigen::VectorXd) v.array().square(); // P = [P_n(x_1), ..., P_n(x_N)]^T
 
-    // Step 2: Append a row of zeros to the bottom of the resulting matrix
-    Eigen::MatrixXd Cut_with_row_and_col                                       = Eigen::MatrixXd::Zero(_cut.rows() + 1, _cut.cols() + 1);
-    Cut_with_row_and_col.block(0, 0, cut_with_col.rows(), cut_with_col.cols()) = cut_with_col;
 
-    _cut = Cut_with_row_and_col;
-
+    // andere Indexreihenfolge
+    Eigen::RowVectorXd v_centers = v(_greedyIDs).transpose(); //auswahl
     Eigen::RowVectorXd new_row = Eigen::RowVectorXd::Ones(n + 1);
 
-    // Step 4: Update new_row if n > 0
-    if (n > 0) {
-      new_row.head(n) = (-Vx * _cut.block(0, 0, n, n)).row(0);
-    }
+    if(n > 0) new_row.head(n) = (-v_centers.head(n) * _cut.block(0, 0, n, n)).row(0);
+    _cut.row(n).head(n+1) = new_row / std::sqrt(pMax);
 
-    _cut.row(n) = new_row / std::sqrt(pMax);
-    _greedyIDs.push_back(ind);
+    //ende::
+
+
+    // Evaluate the first (n-1) bases on the selected point
+    // Eigen::MatrixXd Vx;
+    
+    // if (n > 0) { // Alte Zentren, Neues x: K(X_{n-1}, x_n)^T * C^T = [v_1(x_n), ..., v_{n-1}(x_n)]
+    //   Vx = buildKernelMatrix(
+    //         basisFunction, 
+    //         mesh::Mesh::VertexContainer{x},       // in Mesh
+    //         boost::irange<Eigen::Index>(0, 1),    // in ID: {0}
+    //         _centers,                             // out Mesh
+    //         boost::irange<Eigen::Index>(0, n),    // out ID: {0,...,n-1}
+    //         {{true, true, true}}, Polynomial::OFF // dead Axis and Poly=OFF
+    //       ).transpose() * _cut.block(0, 0, n, n).transpose();
+    // }
+
+
+    // Step 1: Append a column of zeros to the right of Cut_
+    // Eigen::MatrixXd cut_with_col                       = Eigen::MatrixXd::Zero(_cut.rows(), _cut.cols() + 1);
+    // cut_with_col.block(0, 0, _cut.rows(), _cut.cols()) = _cut;
+
+    // Step 2: Append a row of zeros to the bottom of the resulting matrix
+    // Eigen::MatrixXd Cut_with_row_and_col                                       = Eigen::MatrixXd::Zero(_cut.rows() + 1, _cut.cols() + 1);
+    // Cut_with_row_and_col.block(0, 0, cut_with_col.rows(), cut_with_col.cols()) = cut_with_col;
+
+    // _cut = Cut_with_row_and_col;
+
+    // Eigen::RowVectorXd new_row = Eigen::RowVectorXd::Ones(n + 1);
+
+    // Step 4: Update new_row if n > 0
+    // if (n > 0) {
+    //   new_row.head(n) = (-Vx * _cut.block(0, 0, n, n)).row(0);
+    // }
+
+    // _cut.row(n) = new_row / std::sqrt(pMax);
+    // _greedyIDs.push_back(ind);
     _centers.push_back(x);
   }
 
@@ -259,6 +317,7 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
                 ); // = K(outputMesh, _centers) 
 }
 
+
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const
 {
@@ -266,6 +325,7 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const 
   PRECICE_ASSERT(false);
   return Eigen::VectorXd();
 }
+
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const
@@ -281,6 +341,7 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::V
   return prediction;
 }
 
+
 template <typename RADIAL_BASIS_FUNCTION_T>
 void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::clear()
 {
@@ -292,11 +353,13 @@ void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::clear()
   _outSize     = 0;
 }
 
+
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::Index PGreedySolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const
 {
   return _inSize;
 }
+
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 Eigen::Index PGreedySolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const
