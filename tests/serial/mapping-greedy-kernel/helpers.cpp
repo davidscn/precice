@@ -100,6 +100,10 @@ void testGreedyMapping(const std::string configFile, const TestContext &context)
     int    ids[] = {idA, idB, idC};
     interface.readData(meshTwoID, dataAID, ids, maxDt, values);
 
+    std::cout << values[0] << " == " << expectedValTwoA << "\n";
+    std::cout << values[1] << " == " << expectedValTwoB << "\n";
+    std::cout << values[2] << " == " << expectedValTwoC << "\n";
+
     // Due to Eigen 3.3.7 (Ubunu 2004) giving slightly different results
     BOOST_TEST(values[0] == expectedValTwoA, boost::test_tools::tolerance(1e-8));
     BOOST_TEST(values[1] == expectedValTwoB, boost::test_tools::tolerance(3e-2));
