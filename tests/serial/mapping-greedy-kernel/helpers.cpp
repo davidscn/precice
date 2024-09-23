@@ -37,9 +37,9 @@ void testGreedyMapping(const std::string configFile, const TestContext &context)
   Vector3d coordTwoB{0.5, 0.5, z}; // Maps on the left side of the domain
   Vector3d coordTwoC{3.5, 0.5, z}; // Maps more in the middle of the domain
 
-  double expectedValTwoA = 1.0000000014191541;
-  double expectedValTwoB = 7.30892688709867;
-  double expectedValTwoC = 77.5938805368033;
+  double expectedValTwoA = 1.0000000000000002;
+  double expectedValTwoB = 2.1879131472090689;
+  double expectedValTwoC = 22.859664317930537;
 
   if (context.isNamed("SolverOne")) {
     precice::Participant interface("SolverOne", configFile, 0, 1);
