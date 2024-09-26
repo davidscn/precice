@@ -200,34 +200,30 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
   for (int n = 0; n < _maxIter; ++n) {
 
     auto [i, pMax] = select(inputMesh, basisFunction);
+    auto x = inputMesh.vertices().at(i); 
 
     if (pMax < _tolP) {
       std::cout << "end" << "\n";
       break;
     }
-    auto x = inputMesh.vertices().at(i);
 
-    _greedyIDs.push_back(i);
-    _centers.push_back(x);
+    _greedyIDs.push_back(i); // bitvektor setzen => ids und ~ids?
+    _centers.push_back(x); // nach außen?
 
     updateKernelVector(basisFunction, v, inputMesh, x);
+    v -= _basisMatrix * _basisMatrix.block(i, 0, 1, matWidth).transpose(); 
+    v /= std::sqrt(pMax);                           // v = [v_n(x_1), ..., v_n(x_N)]^T (N = _inSize) // nur X \ _centers und x_n nötig
 
-    v -= _basisMatrix * _basisMatrix.block(i, 0, 1, matWidth).transpose();
-    v /= std::sqrt(pMax);                                   // v = [v_n(x_1), ..., v_n(x_N)]^T (N = _inSize)
-    _powerFunction -= (Eigen::VectorXd) v.array().square(); // P = [P_n(x_1), ..., P_n(x_N)]^T
+    _powerFunction -= (Eigen::VectorXd) v.array().square(); // P = [P_n(x_1), ..., P_n(x_N)]^T               // nur X \ _centers nötig
+    _basisMatrix.col(n) = v;
 
     Eigen::RowVectorXd v_centers = v(_greedyIDs).transpose();
-    Eigen::RowVectorXd new_row = Eigen::RowVectorXd::Ones(n + 1);
+    Eigen::RowVectorXd new_row = Eigen::RowVectorXd::Ones(n + 1); // Objekte hier loswerden?
 
-    if(n > 0) new_row.head(n) = (-v_centers.head(n) * _cut.block(0, 0, n, n)).row(0);
-    _cut.row(n).head(n+1) = new_row / std::sqrt(pMax);
-
-
-    std::cout << "it=" << n << ", p=" << pMax << ",   ";
-    std::cout << "C: (" << _cut.rows() << "," << _cut.cols() << ")  V: (" << _basisMatrix.rows() << "," << _basisMatrix.cols() << ")  ID: " << _greedyIDs.size() << "\n";
+    if(n > 0) new_row.head(n) = (-_basisMatrix.block(i, 0, 1, n) * _cut.block(0, 0, n, n)).row(0);
+    _cut.row(n).head(n+1) = new_row / std::sqrt(pMax); // hier v[n] = v_n(x_n) = std::sqrt(pMax)
   }
 
-  // If the mesh creation is shifted into the loop (centerMesh.vertices()), one could visualize the distribution of pMax
   mesh::Mesh centerMesh("greedy-centers", inputMesh.getDimensions(), mesh::Mesh::MESH_ID_UNDEFINED);
   centerMesh.vertices() = _centers;
   io::ExportVTU exporter{"PGreedy", "exports", centerMesh, io::Export::ExportKind::TimeWindows, 1, /*Rank*/ 0, /*size*/ 1};
