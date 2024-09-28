@@ -86,6 +86,7 @@ private:
 
   /// c upper triangular
   Eigen::MatrixXd _cut;
+  Eigen::MatrixXd _resultV;
 
   std::vector<int> _greedyIDs;
 
@@ -174,7 +175,8 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
   _powerFunction = Eigen::VectorXd(_inSize);
   _powerFunction.fill(basisFunction.evaluate(0));
   _basisMatrix = Eigen::MatrixXd::Zero(_inSize, matWidth);
-  _cut = Eigen::MatrixXd::Zero(matWidth, matWidth);
+  //_cut = Eigen::MatrixXd::Zero(matWidth, matWidth);
+  _resultV = Eigen::MatrixXd::Zero(matWidth, matWidth);
   Eigen::MatrixXd _cop = Eigen::MatrixXd::Zero(matWidth, matWidth);
   Eigen::VectorXd v(_inSize);
 
@@ -191,6 +193,7 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
     if (pMax < _tolP) break;
 
     _greedyIDs.push_back(i);  // bitvektor setzen => ids und ~ids?
+    //_notGreedyIDs.push_back(i);
 
     updateKernelVector(basisFunction, inputMesh, v, x);
     v -= _basisMatrix.block(0, 0, _inSize, n) * _basisMatrix.block(i, 0, 1, n).transpose(); 
@@ -199,9 +202,13 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
     _powerFunction -= (Eigen::VectorXd) v.array().square(); // P = [P_n(x_1), ..., P_n(x_N)]^T                // nur X \ _centers nötig
     _basisMatrix.col(n) = v;
 
-    _cut.block(n, 0, 1, n).noalias() = -_basisMatrix.block(i, 0, 1, n) * _cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
-    _cut(n,n) = 1;
-    _cut.block(n, 0, 1, n+1) /= v(i);
+    //std::cout << _basisMatrix << "\n\n\n";
+
+    _resultV.row(n) = _basisMatrix.row(i); // Teste Cholesky
+
+    //_cut.block(n, 0, 1, n).noalias() = -_basisMatrix.block(i, 0, 1, n) * _cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
+    //_cut(n,n) = 1;
+    //_cut.block(n, 0, 1, n+1) /= v(i);
   }
 
   //mesh::Mesh centerMesh("greedy-centers", inputMesh.getDimensions(), mesh::Mesh::MESH_ID_UNDEFINED);
@@ -209,7 +216,11 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
   //io::ExportVTU exporter{"PGreedy", "exports", centerMesh, io::Export::ExportKind::TimeWindows, 1, /*Rank*/ 0, /*size*/ 1};
   //exporter.doExport(0, 0.0);
 
+  //std::cout << _resultV << "\n";
+
   _kernel_eval = buildEvaluationMatrix(basisFunction, outputMesh, inputMesh, _greedyIDs);
+
+  std::cout << "Mapping computed \n";
 }
 
 
@@ -228,11 +239,19 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::V
   // First, compute the c vector
   // see https://eigen.tuxfamily.org/dox/group__TutorialSlicingIndexing.html
 
-  size_t n = _greedyIDs.size();
+  //size_t n = _greedyIDs.size();
   Eigen::VectorXd y = inputData(_greedyIDs);
 
-  Eigen::VectorXd coeff      = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>().transpose() * (_cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * y);
-  Eigen::VectorXd prediction = _kernel_eval.transpose() * coeff;
+  //std::cout << "y: " << y.rows() << "," << y.cols() << "\n";
+  //std::cout << "_resultV: " << _resultV.rows() << "," << _resultV.cols() << "\n";
+  //std::cout << "_kernel_eval: " << _kernel_eval.rows() << "," << _kernel_eval.cols() << "\n";
+  //std::cout << "beta: " << beta.rows() << "," << beta.cols() << "\n";
+
+  //_basisMatrix(_greedyIDs, Eigen::all); geht nicht???
+
+  Eigen::VectorXd beta       = _resultV.triangularView<Eigen::Lower>().solve(y);
+  Eigen::VectorXd alpha      = _resultV.transpose().triangularView<Eigen::Upper>().solve(beta);
+  Eigen::VectorXd prediction = _kernel_eval.transpose() * alpha;
 
   return prediction;
 }
