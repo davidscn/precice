@@ -70,18 +70,14 @@ public:
 private:
   precice::logging::Logger _log{"mapping::PGreedySolver"};
 
-  std::pair<int, double> selectionRule(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction);
   std::pair<int, double> select(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction);
   Eigen::VectorXd        predict(const mesh::Mesh::VertexContainer &vertices, RADIAL_BASIS_FUNCTION_T basisFunction);
 
   /// max iterations
-  const int _maxIter = 1000;
+  const int _maxIter = 2000;
 
   /// n_randon
   const double _tolP = 1e-10;
-
-  /// the selected centers
-  mesh::Mesh::VertexContainer _centers;
 
   /// c upper triangular
   //Eigen::MatrixXd _cut;
@@ -163,49 +159,47 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 template <typename IndexContainer>
 PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
                                                       const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial)
+  : _inSize(inputMesh.vertices().size()), _outSize(outputMesh.vertices().size())
 {
   PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
-  PRECICE_ASSERT(_centers.empty());
   PRECICE_ASSERT(_greedyIDs.empty());
   PRECICE_ASSERT(_kernel_eval.size() == 0); 
 
-  _inSize  = inputMesh.vertices().size();
-  const int matWidth = std::min(static_cast<int>(_inSize), _maxIter); // maximal number of used basis functions
-  _outSize = outputMesh.vertices().size();
+  const int basisSize = std::min(static_cast<int>(_inSize), _maxIter); // maximal number of used basis functions
   _powerFunction = Eigen::VectorXd(_inSize);
   _powerFunction.fill(basisFunction.evaluate(0));
-  _basisMatrix = Eigen::MatrixXd::Zero(_inSize, matWidth);
-  _resultV = Eigen::MatrixXd::Zero(matWidth, matWidth);
+  _basisMatrix = Eigen::MatrixXd::Zero(_inSize, basisSize);
+  _resultV = Eigen::MatrixXd::Zero(basisSize, basisSize);
   Eigen::VectorXd v(_inSize);
-  _greedyIDs.reserve(matWidth); //TODO: Aufräumen
+  _greedyIDs.reserve(basisSize); //TODO: Aufräumen
 
   // Convert dead axis vector into an active axis array so that we can handle the reduction more easily
   std::array<bool, 3> activeAxis({{false, false, false}});
   std::transform(deadAxis.begin(), deadAxis.end(), activeAxis.begin(), [](const auto ax) { return !ax; });
 
   // Iterative selection of new points
-  for (int n = 0; n < _maxIter; ++n) {
+  for (int n = 0; n < basisSize; ++n) {
 
     auto [i, pMax] = select(inputMesh, basisFunction);
     auto x = inputMesh.vertices().at(i); 
 
     if (pMax < _tolP) break;
 
-    _greedyIDs.push_back(i);  // bitvektor setzen => ids und ~ids?
+    _greedyIDs.push_back(i);
 
     updateKernelVector(basisFunction, inputMesh, v, x);
     v -= _basisMatrix.block(0, 0, _inSize, n) * _basisMatrix.block(i, 0, 1, n).transpose(); 
-    v /= std::sqrt(pMax);                                   // v = [v_n(x_1), ..., v_n(x_N)]^T (N = _inSize)  // nur X \ _centers und x_n nötig
+    v /= std::sqrt(pMax);                                   // v = [v_n(x_1), ..., v_n(x_N)]^T (N = _inSize)
 
-    _powerFunction -= (Eigen::VectorXd) v.array().square(); // P = [P_n(x_1), ..., P_n(x_N)]^T                // nur X \ _centers nötig
+    _powerFunction -= (Eigen::VectorXd) v.array().square(); // P = [P_n(x_1), ..., P_n(x_N)]^T
     _basisMatrix.col(n) = v;
 
     _resultV.row(n) = _basisMatrix.row(i); // Teste Cholesky
 
-    std::cout << "iteration = " << n << "\r";
     //_cut.block(n, 0, 1, n).noalias() = -_basisMatrix.block(i, 0, 1, n) * _cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
     //_cut(n,n) = 1;
     //_cut.block(n, 0, 1, n+1) /= v(i);
+    std::cout << "iteration = " << n << "\r";
   }
 
   //mesh::Mesh centerMesh("greedy-centers", inputMesh.getDimensions(), mesh::Mesh::MESH_ID_UNDEFINED);
@@ -244,9 +238,8 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::V
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::clear()
+void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::clear() //TODO: clear() anpassen
 {
-  _centers.clear();
   _greedyIDs.clear();
   _kernel_eval = Eigen::MatrixXd();
   _inSize      = 0;
