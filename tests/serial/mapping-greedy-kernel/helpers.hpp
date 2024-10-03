@@ -7,6 +7,7 @@
 using namespace precice;
 using precice::testing::TestContext;
 
-void testGreedyMapping(const std::string configFile, const TestContext &context);
+void testGreedyMappingDirection1(const std::string configFile, const TestContext &context);
+void testGreedyMappingDirection2(const std::string configFile, const TestContext &context);
 
 #endif

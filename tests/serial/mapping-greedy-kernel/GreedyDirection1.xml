@@ -24,7 +24,7 @@
       from="MeshOne"
       to="MeshTwo"
       constraint="consistent"
-      z-dead="true">
+      z-dead="false">
       <basis-function:gaussian support-radius="2" />
     </mapping:rbf-greedy>
     <read-data name="DataOne" mesh="MeshTwo" />
