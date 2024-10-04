@@ -15,7 +15,8 @@
 #include "mapping/NearestNeighborGradientMapping.hpp"
 #include "mapping/NearestNeighborMapping.hpp"
 #include "mapping/NearestProjectionMapping.hpp"
-#include "mapping/PGreedySolver.hpp"
+#include "mapping/PGreedyCholeskySolver.hpp"
+#include "mapping/FGreedyCutSolver.hpp"
 #include "mapping/PartitionOfUnityMapping.hpp"
 #include "mapping/PetRadialBasisFctMapping.hpp"
 #include "mapping/RadialBasisFctMapping.hpp"
@@ -61,6 +62,7 @@ void addAttributes(TagStorage &storage, const std::vector<variant_t> &attributes
 // Enum required for the RBF instantiations
 enum struct RBFBackend {
   Eigen,
+  EigenGreedy,  //TODO: Das ist unschön.
   PETSc,
   Ginkgo,
   PUM
@@ -75,8 +77,13 @@ struct BackendSelector {
 
 // Specialization for the RBF Eigen backend
 template <typename RBF>
+struct BackendSelector<RBFBackend::EigenGreedy, RBF> {
+  typedef mapping::RadialBasisFctMapping<FGreedySolver<RBF>> type;
+};
+
+template <typename RBF>
 struct BackendSelector<RBFBackend::Eigen, RBF> {
-  typedef mapping::RadialBasisFctMapping<PGreedySolver<RBF>> type;
+  typedef mapping::RadialBasisFctMapping<RadialBasisFctSolver<RBF>> type;
 };
 
 // Specialization for the PETSc RBF backend
@@ -186,6 +193,8 @@ MappingConfiguration::MappingConfiguration(
       XMLTag{*this, TYPE_RBF_GLOBAL_DIRECT, occ, TAG}.setDocumentation("Radial-basis-function mapping using a direct solver with a gather-scatter parallelism.")};
   std::list<XMLTag> rbfIterativeTags{
       XMLTag{*this, TYPE_RBF_GLOBAL_ITERATIVE, occ, TAG}.setDocumentation("Radial-basis-function mapping using an iterative solver with a distributed parallelism.")};
+  std::list<XMLTag> rbfGreedyTags{ // TODO: Hier Tag für Greedy Typen erstellen
+      XMLTag{*this, TYPE_RBF_GREEDY, occ, TAG}.setDocumentation("Radial-basis-function mapping using P-Greedy.")};
   std::list<XMLTag> pumDirectTags{
       XMLTag{*this, TYPE_RBF_PUM_DIRECT, occ, TAG}.setDocumentation("Radial-basis-function mapping using a partition of unity method, which supports a distributed parallelism.")};
   std::list<XMLTag> rbfAliasTag{
@@ -247,6 +256,7 @@ MappingConfiguration::MappingConfiguration(
   // Add the relevant attributes to the relevant tags
   addAttributes(projectionTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint});
   addAttributes(rbfDirectTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrPolynomial, attrXDead, attrYDead, attrZDead});
+  addAttributes(rbfGreedyTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrPolynomial, attrXDead, attrYDead, attrZDead}); // TODO: Hier Tag für Greedy Typen registrieren. //TODO: prüfe ob attrPolynomial, ... notwendig?
   addAttributes(rbfIterativeTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrPolynomial, attrXDead, attrYDead, attrZDead, attrSolverRtol});
   addAttributes(pumDirectTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrPumPolynomial, verticesPerCluster, relativeOverlap, projectToInput});
   addAttributes(rbfAliasTag, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrXDead, attrYDead, attrZDead});
@@ -268,7 +278,7 @@ MappingConfiguration::MappingConfiguration(
         XMLTag{*this, EXECUTOR_CUDA, once, SUBTAG_EXECUTOR}.setDocumentation("Cuda (Nvidia) executor, which uses cuSolver/Ginkgo and a direct QR decomposition with a gather-scatter parallelism."),
         XMLTag{*this, EXECUTOR_HIP, once, SUBTAG_EXECUTOR}.setDocumentation("Hip (AMD/Nvidia) executor, which uses hipSolver/Ginkgo and a direct QR decomposition with a gather-scatter parallelism.")};
 
-    addAttributes(deviceExecutors, {attrDeviceId});
+    addAttributes(deviceExecutors, {attrDeviceId}); //TODO: Greedy hier hinzufügen?!
     addSubtagsToParents(cpuExecutor, rbfDirectTags);
     addSubtagsToParents(deviceExecutors, rbfDirectTags);
   }
@@ -293,6 +303,13 @@ MappingConfiguration::MappingConfiguration(
         XMLTag{*this, EXECUTOR_CPU, once, SUBTAG_EXECUTOR}.setDocumentation("The default (and currently only) executor using a CPU and a distributed memory parallelism via MPI.")};
     addSubtagsToParents(cpuExecutor, pumDirectTags);
   }
+  //TODO: Greedy Executor SUBTAG_EXECUTOR????
+  {
+    std::list<XMLTag> cpuExecutor{
+        XMLTag{*this, EXECUTOR_CPU, once, SUBTAG_EXECUTOR}.setDocumentation("The default (and currently only) executor using a CPU.")};
+    addSubtagsToParents(cpuExecutor, rbfGreedyTags);
+  }
+
   // The alias tag doesn't receive the subtag at all
 
   // Now we take care of the subtag basis function
@@ -311,6 +328,7 @@ MappingConfiguration::MappingConfiguration(
   addAttributes(supportRadiusRBF, {attrSupportRadius});
   addSubtagsToParents(supportRadiusRBF, rbfIterativeTags);
   addSubtagsToParents(supportRadiusRBF, rbfDirectTags);
+  addSubtagsToParents(supportRadiusRBF, rbfGreedyTags); //TODO: Greedy hat "support radius"
   addSubtagsToParents(supportRadiusRBF, pumDirectTags);
   addSubtagsToParents(supportRadiusRBF, rbfAliasTag);
 
@@ -325,6 +343,7 @@ MappingConfiguration::MappingConfiguration(
   addAttributes(shapeParameterRBF, {attrShapeParam});
   addSubtagsToParents(shapeParameterRBF, rbfIterativeTags);
   addSubtagsToParents(shapeParameterRBF, rbfDirectTags);
+  addSubtagsToParents(shapeParameterRBF, rbfGreedyTags); //TODO: Greedy hat "shape parameter"
   addSubtagsToParents(shapeParameterRBF, pumDirectTags);
   addSubtagsToParents(shapeParameterRBF, rbfAliasTag);
 
@@ -336,6 +355,7 @@ MappingConfiguration::MappingConfiguration(
   addAttributes(GaussRBF, {attrShapeParam, attrSupportRadius});
   addSubtagsToParents(GaussRBF, rbfIterativeTags);
   addSubtagsToParents(GaussRBF, rbfDirectTags);
+  addSubtagsToParents(GaussRBF, rbfGreedyTags); //TODO: Greedy
   addSubtagsToParents(GaussRBF, pumDirectTags);
   addSubtagsToParents(GaussRBF, rbfAliasTag);
 
@@ -346,6 +366,7 @@ MappingConfiguration::MappingConfiguration(
 
   addSubtagsToParents(attributelessRBFs, rbfIterativeTags);
   addSubtagsToParents(attributelessRBFs, rbfDirectTags);
+  addSubtagsToParents(attributelessRBFs, rbfGreedyTags); //TODO: Greedy
   addSubtagsToParents(attributelessRBFs, pumDirectTags);
   addSubtagsToParents(attributelessRBFs, rbfAliasTag);
 
@@ -353,6 +374,7 @@ MappingConfiguration::MappingConfiguration(
   parent.addSubtags(projectionTags);
   parent.addSubtags(rbfIterativeTags);
   parent.addSubtags(rbfDirectTags);
+  parent.addSubtags(rbfGreedyTags); //TODO: Greedy
   parent.addSubtags(pumDirectTags);
   parent.addSubtags(rbfAliasTag);
   parent.addSubtags(geoMultiscaleTags);
@@ -490,6 +512,8 @@ MappingConfiguration::RBFConfiguration MappingConfiguration::configureRBFMapping
     rbfConfig.solver = RBFConfiguration::SystemSolver::GlobalIterative;
   else if (type == TYPE_RBF_GLOBAL_DIRECT)
     rbfConfig.solver = RBFConfiguration::SystemSolver::GlobalDirect;
+  else if (type == TYPE_RBF_GREEDY) //TODO: Greedy-Typ Abfrage: Zuweisung zu Löser
+    rbfConfig.solver = RBFConfiguration::SystemSolver::Greedy;
   else if (type == TYPE_RBF_PUM_DIRECT)
     rbfConfig.solver = RBFConfiguration::SystemSolver::PUMDirect;
   else {
@@ -687,7 +711,10 @@ void MappingConfiguration::finishRBFConfiguration()
   if (_executorConfig->executor == ExecutorConfiguration::Executor::CPU) {
     if (_rbfConfig.solver == RBFConfiguration::SystemSolver::GlobalDirect) {
       mapping.mapping = getRBFMapping<RBFBackend::Eigen>(_rbfConfig.basisFunction, constraintValue, mapping.fromMesh->getDimensions(), _rbfConfig.supportRadius, _rbfConfig.shapeParameter, _rbfConfig.deadAxis, _rbfConfig.polynomial);
-    } else if (_rbfConfig.solver == RBFConfiguration::SystemSolver::GlobalIterative) {
+    } else if (_rbfConfig.solver == RBFConfiguration::SystemSolver::Greedy) {
+      mapping.mapping = getRBFMapping<RBFBackend::EigenGreedy>(_rbfConfig.basisFunction, constraintValue, mapping.fromMesh->getDimensions(), _rbfConfig.supportRadius, _rbfConfig.shapeParameter, _rbfConfig.deadAxis, _rbfConfig.polynomial);
+    }
+    else if (_rbfConfig.solver == RBFConfiguration::SystemSolver::GlobalIterative) {
 #ifndef PRECICE_NO_PETSC
       // for petsc initialization
       utils::Petsc::initialize(utils::Parallel::current()->comm);
@@ -703,6 +730,7 @@ void MappingConfiguration::finishRBFConfiguration()
     }
     // 2. any other executor is configured via Ginkgo
   } else {
+    //TODO: Greedy mit anderem Executor?
 #ifndef PRECICE_NO_GINKGO
     _ginkgoParameter                   = GinkgoParameter();
     _ginkgoParameter.usePreconditioner = false;
@@ -748,7 +776,7 @@ const std::vector<MappingConfiguration::ConfiguredMapping> &MappingConfiguration
 
 bool MappingConfiguration::requiresBasisFunction(const std::string &mappingType) const
 {
-  return mappingType == TYPE_RBF_PUM_DIRECT || mappingType == TYPE_RBF_GLOBAL_DIRECT || mappingType == TYPE_RBF_GLOBAL_ITERATIVE || mappingType == TYPE_RBF_ALIAS;
+  return mappingType == TYPE_RBF_PUM_DIRECT || mappingType == TYPE_RBF_GLOBAL_DIRECT || mappingType == TYPE_RBF_GREEDY || mappingType == TYPE_RBF_GLOBAL_ITERATIVE || mappingType == TYPE_RBF_ALIAS;
 }
 
 BasisFunction MappingConfiguration::parseBasisFunctions(const std::string &basisFctName) const
