@@ -183,8 +183,8 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
     v.head(n) = v2.head(n) / std::sqrt(pMax);
 
     _cut.block(n, 0, 1, n).noalias() = -v.block(0, 0, n, 1).transpose() * _cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
-    _cut(n,n) = 1;
-    _cut.block(n, 0, 1, n+1) /= v(n);
+    _cut(n, n) = 1;
+    _cut.block(n, 0, 1, n + 1) /= v(n);
 
     updatePowerFunction(basisFunction, inputMesh, activeAxis);
 

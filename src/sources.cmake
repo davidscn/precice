@@ -176,7 +176,8 @@ target_sources(preciceCore
     src/mapping/AxialGeoMultiscaleMapping.hpp
     src/mapping/BarycentricBaseMapping.cpp
     src/mapping/BarycentricBaseMapping.hpp
-    src/mapping/FGreedySolver.hpp
+    src/mapping/FGreedyCholeskySolver.hpp
+    src/mapping/FGreedyCutSolver.hpp
     src/mapping/GinkgoDefinitions.hpp
     src/mapping/GinkgoRadialBasisFctSolver.hpp
     src/mapping/LinearCellInterpolationMapping.cpp

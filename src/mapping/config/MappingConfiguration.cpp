@@ -16,7 +16,7 @@
 #include "mapping/NearestNeighborMapping.hpp"
 #include "mapping/NearestProjectionMapping.hpp"
 #include "mapping/PGreedyCholeskySolver.hpp"
-#include "mapping/FGreedySolver.hpp"
+#include "mapping/FGreedyCutSolver.hpp"
 #include "mapping/PartitionOfUnityMapping.hpp"
 #include "mapping/PetRadialBasisFctMapping.hpp"
 #include "mapping/RadialBasisFctMapping.hpp"
@@ -62,7 +62,7 @@ void addAttributes(TagStorage &storage, const std::vector<variant_t> &attributes
 // Enum required for the RBF instantiations
 enum struct RBFBackend {
   Eigen,
-  EigenGreedy,  //TODO: Das ist unschön. Aber intern die Methoder durch das Backend zu bestimmen auch!
+  EigenGreedy,  //TODO: Das ist unschön.
   PETSc,
   Ginkgo,
   PUM
@@ -78,7 +78,7 @@ struct BackendSelector {
 // Specialization for the RBF Eigen backend
 template <typename RBF>
 struct BackendSelector<RBFBackend::EigenGreedy, RBF> {
-  typedef mapping::RadialBasisFctMapping<PGreedySolver<RBF>> type;
+  typedef mapping::RadialBasisFctMapping<FGreedySolver<RBF>> type;
 };
 
 template <typename RBF>
