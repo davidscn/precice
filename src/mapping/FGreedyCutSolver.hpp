@@ -182,7 +182,7 @@ Eigen::VectorXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::V
   greedyIDs.reserve(_basisSize);
   Eigen::VectorXd v = Eigen::VectorXd::Ones(_basisSize);
   Eigen::VectorXd v2 = Eigen::VectorXd::Ones(_basisSize);
-  Eigen::VectorXd c = Eigen::VectorXd::Zero(_inSize);
+  Eigen::VectorXd c = Eigen::VectorXd::Zero(_basisSize);
 
   // Iterative selection of new points
   for (int n = 0; n < _basisSize; ++n) {
@@ -208,7 +208,6 @@ Eigen::VectorXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::V
   }
 
   Eigen::MatrixXd kernelEval = buildEvaluationMatrix(greedyIDs);
-  
   Eigen::VectorXd y = inputData(greedyIDs);
   Eigen::VectorXd prediction = kernelEval.transpose() * c;
 
