@@ -90,6 +90,7 @@ public:
     std::array<bool, 3> deadAxis{};
     Polynomial          polynomial{};
     double              solverRtol{};
+    int                 maxIterations{}; //TODO: Greedy
     int                 verticesPerCluster{};
     double              relativeOverlap{};
     bool                projectToInput{};
@@ -217,7 +218,7 @@ private:
   // const std::string ATTR_USE_PRECONDITIONER    = "use-preconditioner";
   // const std::string ATTR_PRECONDITIONER        = "preconditioner";
   // const std::string ATTR_JACOBI_BLOCK_SIZE     = "jacobi-block-size";
-  // const std::string ATTR_MAX_ITERATIONS        = "max-iterations";
+  const std::string ATTR_MAX_ITERATIONS        = "max-iterations"; // TODO: für Greedy
 
   // mapping constraint
   Mapping::Constraint constraintValue{};
@@ -277,6 +278,7 @@ private:
                                        const std::string &polynomial,
                                        bool xDead, bool yDead, bool zDead,
                                        double solverRtol,
+                                       int maxIterations, // TODO: Greedy
                                        double verticesPerCluster,
                                        double relativeOverlap,
                                        bool   projectToInput) const;

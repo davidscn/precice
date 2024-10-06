@@ -11,6 +11,8 @@
 #include "mesh/Mesh.hpp"
 #include "precice/impl/Types.hpp"
 #include "profiling/Event.hpp"
+#include <iostream>
+#include <fstream>
 
 namespace precice {
 namespace mapping {
@@ -54,7 +56,7 @@ private:
   void updateKernelVector(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis, Eigen::VectorXd &kernelVector, const mesh::Vertex &x);
 
   /// max iterations
-  const int _maxIter = 2000;
+  int _maxIter = 2000;
   /// Tolerance value of the power function (projection residual)
   const double _tolP = 1e-10;
 
@@ -128,10 +130,12 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 {
   precice::profiling::Event solveEvent("PGreedyCholesky.initialize", profiling::Synchronize);
 
-  PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
+  //PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
   PRECICE_ASSERT(RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite());
   PRECICE_ASSERT(_greedyIDs.empty());
   PRECICE_ASSERT(_kernelEval.size() == 0); 
+
+  _maxIter = (int) (0.2 * _inSize);
 
   const int basisSize = std::min(static_cast<int>(_inSize), _maxIter); // maximal number of used basis functions
   _powerFunction = Eigen::VectorXd(_inSize);
@@ -145,6 +149,7 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
   std::array<bool, 3> activeAxis({{false, false, false}});
   std::transform(deadAxis.begin(), deadAxis.end(), activeAxis.begin(), [](const auto ax) { return !ax; });
 
+  int endN = 0; double endP = 0;
   // Iterative selection of new points
   for (int n = 0; n < basisSize; ++n) {
 
@@ -163,17 +168,29 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
     _resultV.row(n) = _basisMatrix.row(i); // TODO: Teste Cholesky
 
-    std::cout << "iteration = " << n << "\r";
+    std::cout << "n=" << n << " von " << basisSize << ", P=" << pMax << "\r";
+    endN = n;
+    endP = pMax;
   }
+
+  _kernelEval = buildEvaluationMatrix(basisFunction, outputMesh, inputMesh, activeAxis);
+
+  solveEvent.stop();
 
   //mesh::Mesh centerMesh("greedy-centers", inputMesh.getDimensions(), mesh::Mesh::MESH_ID_UNDEFINED);
   //centerMesh.vertices() = _centers;
   //io::ExportVTU exporter{"PGreedy", "exports", centerMesh, io::Export::ExportKind::TimeWindows, 1, /*Rank*/ 0, /*size*/ 1};
   //exporter.doExport(0, 0.0);
 
-  _kernelEval = buildEvaluationMatrix(basisFunction, outputMesh, inputMesh, activeAxis);
+  const std::string filename = "/home/fabio/entwicklung/bachelorarbeit/turbine_test/PValue.txt";
+  std::ofstream pout;
+  pout.open(filename, std::fstream::in | std::fstream::out | std::fstream::app);
 
-  solveEvent.stop();
+  if(!pout) {
+    pout.open(filename, std::fstream::in | std::fstream::out | std::fstream::trunc);
+  }
+  pout << "n = " << endN << " (" << _inSize << "), P = " << endP << "\n";
+  pout.close();
 }
 
 

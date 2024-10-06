@@ -149,7 +149,7 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
                                                       const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial)
   : _inSize(inputMesh.vertices().size()), _outSize(outputMesh.vertices().size())
 {
-  PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
+  // PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
   PRECICE_ASSERT(RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite());
   PRECICE_ASSERT(_greedyIDs.empty());
   PRECICE_ASSERT(_kernelEval.size() == 0); 
@@ -178,13 +178,15 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
     if (pMax < _tolP) break;
 
+    const double p = std::sqrt(pMax);
+
     updateKernelVector(basisFunction, inputMesh, activeAxis, v, x);
     v2.head(n) = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * v.head(n);
-    v.head(n) = v2.head(n) / std::sqrt(pMax);
+    v.head(n) = v2.head(n) / p;
 
     _cut.block(n, 0, 1, n).noalias() = -v.block(0, 0, n, 1).transpose() * _cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
     _cut(n, n) = 1;
-    _cut.block(n, 0, 1, n + 1) /= v(n);
+    _cut.block(n, 0, 1, n + 1) /= p;
 
     updatePowerFunction(basisFunction, inputMesh, activeAxis);
 

@@ -145,7 +145,7 @@ FGreedySolver<RADIAL_BASIS_FUNCTION_T>::FGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 {
   precice::profiling::Event initEvent("FGreedy.initialize", profiling::Synchronize);
 
-  PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
+  //PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
   PRECICE_ASSERT(RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite());
   PRECICE_ASSERT(_kernelEval.size() == 0); 
 
@@ -200,7 +200,7 @@ Eigen::VectorXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::V
 
     cut.block(n, 0, 1, n).noalias() = -v.block(0, 0, n, 1).transpose() * cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
     cut(n, n) = 1;
-    cut.block(n, 0, 1, n + 1) /= v(n);
+    cut.block(n, 0, 1, n + 1) /= p;
 
     residual = recalculateResidual(greedyIDs, cut, kernelMatrix, inputData, c);
 
