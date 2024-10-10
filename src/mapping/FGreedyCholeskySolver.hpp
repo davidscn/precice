@@ -12,31 +12,32 @@
 #include "precice/impl/Types.hpp"
 #include "profiling/Event.hpp"
 #include <fenv.h>
+#include "mapping/config/MappingConfiguration.hpp"
 
 namespace precice {
 namespace mapping {
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-class FGreedySolver {
+class FGreedyCholeskySolver {
 public:
   using DecompositionType = std::conditional_t<RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite(), Eigen::LLT<Eigen::MatrixXd>, Eigen::ColPivHouseholderQR<Eigen::MatrixXd>>;
   using BASIS_FUNCTION_T  = RADIAL_BASIS_FUNCTION_T;
   /// Default constructor
-  FGreedySolver() = default;
+  FGreedyCholeskySolver() = default;
 
   /**
    * computes the greedy centers and stores data structures to later on evaluate the reduced model
   */
   template <typename IndexContainer>
-  FGreedySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
-                const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial);
+  FGreedyCholeskySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
+                const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial, MappingConfiguration::GreedyParameter greedyParameter);
 
   /// Maps the given input data
-  Eigen::VectorXd solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const;
+  Eigen::VectorXd solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial);
 
   /// Maps the given input data
-  Eigen::VectorXd solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const;
+  Eigen::VectorXd solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial);
 
   // Clear all stored matrices
   void clear();
@@ -48,51 +49,55 @@ public:
   Eigen::Index getOutputSize() const;
 
 private:
-  precice::logging::Logger _log{"mapping::FGreedySolver"};
+  precice::logging::Logger _log{"mapping::FGreedyCholeskySolver"};
 
   std::pair<int, double> select(const Eigen::VectorXd &residual) const;
 
   Eigen::MatrixXd buildEvaluationMatrix(const std::vector<int> &greedyIDs) const;
-  void updateKernelVector(Eigen::VectorXd &kernelVector, const mesh::Vertex &x) const;
+  void updateKernelVector(const mesh::Vertex &x, Eigen::VectorXd &kernelVector) const;
 
   /// max iterations
-  const int _maxIter = 2000;
+  size_t _maxIter;
 
   /// n_randon
-  const double _tolF = 1e-10;
+  double _tolF;
 
-  Eigen::Index    _inSize  = 0;
-  Eigen::Index    _outSize = 0;
+  size_t _inSize  = 0;
+  size_t _outSize = 0;
+  size_t _basisSize;
   Eigen::MatrixXd _kernelEval;
 
-  const mesh::Mesh::VertexContainer _inputVertices;
-  const mesh::Mesh::VertexContainer _outputVertices;
+  const std::shared_ptr<precice::mesh::Mesh::VertexContainer> _inputVertices;
+  const std::shared_ptr<precice::mesh::Mesh::VertexContainer> _outputVertices;
+
+  Eigen::MatrixXd _basisMatrix;
+  Eigen::MatrixXd _decomposedV;
+  std::vector<int> _greedyIDs;
   RADIAL_BASIS_FUNCTION_T _basisFunction;
-  int _basisSize;
   std::array<bool, 3> _activeAxis;
 };
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-std::pair<int, double> FGreedySolver<RADIAL_BASIS_FUNCTION_T>::select(const Eigen::VectorXd &residual) const
+std::pair<int, double> FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::select(const Eigen::VectorXd &residual) const
 {
   Eigen::Index maxIndex;
-  double maxValue = residual.maxCoeff(&maxIndex);
+  double maxValue = residual.cwiseAbs().maxCoeff(&maxIndex);
   return {maxIndex, maxValue};
 }
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::MatrixXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(const std::vector<int> &greedyIDs) const
+Eigen::MatrixXd FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(const std::vector<int> &greedyIDs) const
 {
-  Eigen::MatrixXd matrixA(greedyIDs.size(), _outputVertices.size());
+  Eigen::MatrixXd matrixA(greedyIDs.size(), _outputVertices->size());
 
   for (size_t i = 0; i < greedyIDs.size(); i++) 
   {
-    const auto &u = _inputVertices.at(greedyIDs.at(i)).rawCoords();
-    for (size_t j = 0; j < _outputVertices.size(); j++) 
+    const auto &u = _inputVertices->at(greedyIDs.at(i)).rawCoords();
+    for (size_t j = 0; j < _outputVertices->size(); j++) 
     {
-      const auto  &v = _outputVertices.at(j).rawCoords();
-      const double squaredDifference = computeSquaredDifference(u, v, _activeAxis); //TODO: Aktive Achsen
+      const auto  &v = _outputVertices->at(j).rawCoords();
+      const double squaredDifference = computeSquaredDifference(u, v, _activeAxis);
       matrixA(i, j) = _basisFunction.evaluate(std::sqrt(squaredDifference));
     }
   }
@@ -101,11 +106,11 @@ Eigen::MatrixXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(co
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void FGreedySolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(Eigen::VectorXd &kernelVector, const mesh::Vertex &x) const
+void FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vertex &x, Eigen::VectorXd &kernelVector) const
 {
-  for (size_t j = 0; j < _inputVertices.size(); j++)
+  for (size_t j = 0; j < _inputVertices->size(); j++)
   {
-    const auto &y = _inputVertices.at(j).rawCoords();
+    const auto &y = _inputVertices->at(j).rawCoords();
     kernelVector(j) = _basisFunction.evaluate(std::sqrt(computeSquaredDifference(x.rawCoords(), y, _activeAxis))); 
   }
 }
@@ -116,26 +121,26 @@ void FGreedySolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(Eigen::VectorXd 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 template <typename IndexContainer>
-FGreedySolver<RADIAL_BASIS_FUNCTION_T>::FGreedySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
-                                                      const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial)
+FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::FGreedyCholeskySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
+                                                      const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial, MappingConfiguration::GreedyParameter greedyParameter)
   : _inSize(inputMesh.vertices().size()), 
     _outSize(outputMesh.vertices().size()), 
-    _inputVertices(inputMesh.vertices()),
-    _outputVertices(outputMesh.vertices()),
+    _inputVertices(std::make_shared<mesh::Mesh::VertexContainer>(std::move(inputMesh.vertices()))),
+    _outputVertices(std::make_shared<mesh::Mesh::VertexContainer>(std::move(outputMesh.vertices()))),
     _basisFunction(basisFunction)
 {
-  precice::profiling::Event initEvent("FGreedy.initialize", profiling::Synchronize);
-
-  //PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
-  PRECICE_ASSERT(RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite());
+  PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
   PRECICE_ASSERT(_kernelEval.size() == 0); 
 
-  _basisSize = std::min(static_cast<int>(_inSize), _maxIter);
+  _tolF = greedyParameter.tolerance;
+  _maxIter = greedyParameter.maxIterations;
+  _basisSize = std::min(_inSize, _maxIter);
+  _basisMatrix = Eigen::MatrixXd::Zero(_inSize, _basisSize);
+  _decomposedV = Eigen::MatrixXd::Zero(_basisSize, _basisSize);
+  _greedyIDs.reserve(_basisSize);
 
   _activeAxis = std::array<bool, 3>({{false, false, false}});
   std::transform(deadAxis.begin(), deadAxis.end(), _activeAxis.begin(), [](const auto ax) { return !ax; });
-
-  initEvent.stop();
 }
 
 
@@ -143,7 +148,7 @@ FGreedySolver<RADIAL_BASIS_FUNCTION_T>::FGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::VectorXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const
+Eigen::VectorXd FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial)
 {
   // Not implemented
   PRECICE_ASSERT(false);
@@ -152,68 +157,67 @@ Eigen::VectorXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const 
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::VectorXd FGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const
+Eigen::VectorXd FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial)
 {
-  precice::profiling::Event solveEvent("FGreedy.solveConsistent", profiling::Synchronize);
-
-  Eigen::VectorXd v(_inSize);
+  Eigen::VectorXd basisVector(_inSize);
   Eigen::VectorXd residual = inputData;
-  Eigen::MatrixXd basisMatrix = Eigen::MatrixXd::Zero(_inSize, _basisSize);
-  Eigen::MatrixXd resultV = Eigen::MatrixXd::Zero(_basisSize, _basisSize);
-  std::vector<int> greedyIDs;
-  greedyIDs.reserve(_basisSize);
+  _greedyIDs.clear();
 
   // Iterative selection of new points
-  for (int n = 0; n < _basisSize; ++n) {
+  for (size_t n = 0; n < _basisSize; ++n) {
 
     auto [i, fMax] = select(residual);
-    auto x = _inputVertices.at(i); 
-    greedyIDs.push_back(i);
+    auto x = _inputVertices->at(i); 
 
-    if (fMax < _tolF) break;
+    updateKernelVector(x, basisVector);
+    basisVector -= _basisMatrix.block(0, 0, _inSize, n) * _basisMatrix.block(i, 0, 1, n).transpose();
 
-    updateKernelVector(v, x);
-    v -= basisMatrix.block(0, 0, _inSize, n) * basisMatrix.block(i, 0, 1, n).transpose();
-    double p = std::sqrt(v(i));
-    v /= p;                 
-    basisMatrix.col(n) = v;
-    resultV.row(n) = basisMatrix.row(i); // TODO: Teste Cholesky
+    if (fMax < _tolF || basisVector(i) <= 0) break;
+    _greedyIDs.push_back(i);
 
-    double c = residual(i) / p;
-    residual -= c * v;
+    const double invP = 1.0 / std::sqrt(basisVector(i));
+    basisVector *= invP;    
+    _basisMatrix.col(n) = basisVector;
+    _decomposedV.row(n) = _basisMatrix.row(i); // TODO: necessary?
+
+    const double newtonCoefficient = residual(i) * invP;
+    residual -= newtonCoefficient * basisVector;
+
+    PRECICE_DEBUG("Iteration: {}, fMax = {}, P = {}", n + 1, fMax, basisVector(i));
   }
 
-  Eigen::MatrixXd kernelEval = buildEvaluationMatrix(greedyIDs);
+  size_t n = _greedyIDs.size();
+  Eigen::MatrixXd kernelEval = buildEvaluationMatrix(_greedyIDs);
   
-  Eigen::VectorXd y = inputData(greedyIDs);
-  Eigen::VectorXd beta  = resultV.triangularView<Eigen::Lower>().solve(y);
-  Eigen::VectorXd alpha = resultV.transpose().triangularView<Eigen::Upper>().solve(beta);
-  Eigen::VectorXd prediction = kernelEval.transpose() * alpha;
-
-  solveEvent.stop();
+  Eigen::IndexedView y = inputData(_greedyIDs);
+  Eigen::VectorXd interpolationCoeffs = _decomposedV.block(0, 0, n, n).triangularView<Eigen::Lower>().solve(y); // TODO: solveInPlace?
+  _decomposedV.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>().solveInPlace(interpolationCoeffs);
+  Eigen::VectorXd prediction = kernelEval.transpose() * interpolationCoeffs;
 
   return prediction;
 }
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void FGreedySolver<RADIAL_BASIS_FUNCTION_T>::clear()
+void FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::clear()
 {
-  _kernelEval = Eigen::MatrixXd();
-  _inSize     = 0;
-  _outSize    = 0;
+  _kernelEval  = Eigen::MatrixXd();
+  _decomposedV = Eigen::MatrixXd();
+  _basisMatrix = Eigen::MatrixXd();
+  _inSize  = 0;
+  _outSize = 0;
 }
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::Index FGreedySolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const
+Eigen::Index FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const
 {
   return _inSize;
 }
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::Index FGreedySolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const
+Eigen::Index FGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const
 {
   return _outSize;
 }

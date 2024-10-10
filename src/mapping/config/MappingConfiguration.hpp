@@ -49,6 +49,14 @@ public:
     bool         enableUnifiedMemory = false;
   };
 
+  struct GreedyParameter {
+    std::string  executor      = "reference-executor";
+    std::string  solver        = "greedy-solver";
+    std::string  subType       = "P-cholesky";
+    double       tolerance     = 1e-8;
+    std::size_t  maxIterations = 1e6;
+  };
+
   MappingConfiguration(
       xml::XMLTag &              parent,
       mesh::PtrMeshConfiguration meshConfiguration);
@@ -98,6 +106,7 @@ public:
     double              supportRadius{};
     double              shapeParameter{};
     bool                basisFunctionDefined = false;
+    std::string         greedySubType{}; //TODO: Greedy
   };
 
   struct GeoMultiscaleConfiguration {
@@ -218,7 +227,10 @@ private:
   // const std::string ATTR_USE_PRECONDITIONER    = "use-preconditioner";
   // const std::string ATTR_PRECONDITIONER        = "preconditioner";
   // const std::string ATTR_JACOBI_BLOCK_SIZE     = "jacobi-block-size";
-  const std::string ATTR_MAX_ITERATIONS        = "max-iterations"; // TODO: für Greedy
+
+  // Experimantal greedy attributes
+  const std::string ATTR_MAX_ITERATIONS = "max-iterations";
+  const std::string ATTR_GREEDY_SUBTYPE = "greedy-type";
 
   // mapping constraint
   Mapping::Constraint constraintValue{};
@@ -250,6 +262,9 @@ private:
 
   // Settings for the iterative solvers provided by Ginkgo
   GinkgoParameter _ginkgoParameter;
+
+  // Greedy solver Settings
+  GreedyParameter _greedyParameter;
 
   /**
    * Configures and instantiates all mappings, which do not require

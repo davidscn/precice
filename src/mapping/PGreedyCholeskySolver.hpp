@@ -13,25 +13,26 @@
 #include "profiling/Event.hpp"
 #include <iostream>
 #include <fstream>
+#include "mapping/config/MappingConfiguration.hpp"
 
 namespace precice {
 namespace mapping {
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-class PGreedySolver {
+class PGreedyCholeskySolver {
 public:
   using DecompositionType = std::conditional_t<RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite(), Eigen::LLT<Eigen::MatrixXd>, Eigen::ColPivHouseholderQR<Eigen::MatrixXd>>;
   using BASIS_FUNCTION_T  = RADIAL_BASIS_FUNCTION_T;
   /// Default constructor
-  PGreedySolver() = default;
+  PGreedyCholeskySolver() = default;
 
   /**
    * computes the greedy centers and stores data structures to later on evaluate the reduced model
   */
   template <typename IndexContainer>
-  PGreedySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
-                const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial);
+  PGreedyCholeskySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
+                const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial, MappingConfiguration::GreedyParameter greedyParameter);
 
   /// Maps the given input data
   Eigen::VectorXd solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const;
@@ -49,19 +50,14 @@ public:
   Eigen::Index getOutputSize() const;
 
 private:
-  precice::logging::Logger _log{"mapping::PGreedySolver"};
+  precice::logging::Logger _log{"mapping::PGreedyCholeskySolver"};
 
   std::pair<int, double> select(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction);
   Eigen::MatrixXd buildEvaluationMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &outputMesh, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis);
-  void updateKernelVector(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis, Eigen::VectorXd &kernelVector, const mesh::Vertex &x);
+  void updateKernelVector(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis, const mesh::Vertex &x, Eigen::VectorXd &kernelVector);
 
-  /// max iterations
-  int _maxIter = 2000;
-  /// Tolerance value of the power function (projection residual)
-  const double _tolP = 1e-10;
-
-  Eigen::Index    _inSize  = 0;
-  Eigen::Index    _outSize = 0;
+  size_t _inSize  = 0;
+  size_t _outSize = 0;
 
   /// Selected mesh vertices used for interpolation
   std::vector<int> _greedyIDs;
@@ -69,7 +65,7 @@ private:
   /// Full newton basis matrix
   Eigen::MatrixXd _basisMatrix;
   /// Reordered relevant part of the newton basis matrix: The cholesky decomposition of the kernel matrix
-  Eigen::MatrixXd  _resultV;
+  Eigen::MatrixXd  _decomposedV;
   /// Kernel evaluations on the in- and output mesh
   Eigen::MatrixXd _kernelEval;
   /// Power function evaluations for each input vertex: : iteratively updated
@@ -77,7 +73,7 @@ private:
 };
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-std::pair<int, double> PGreedySolver<RADIAL_BASIS_FUNCTION_T>::select(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction)
+std::pair<int, double> PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::select(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction)
 {
   Eigen::Index maxIndex;
   double maxValue = _powerFunction.maxCoeff(&maxIndex);
@@ -86,7 +82,7 @@ std::pair<int, double> PGreedySolver<RADIAL_BASIS_FUNCTION_T>::select(const mesh
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::MatrixXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &outputMesh, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis)
+Eigen::MatrixXd PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &outputMesh, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis)
 {
   const mesh::Mesh::VertexContainer& inputVertices = inputMesh.vertices();
   const mesh::Mesh::VertexContainer& outputVertices = outputMesh.vertices();
@@ -108,7 +104,7 @@ Eigen::MatrixXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(RA
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis, Eigen::VectorXd &kernelVector, const mesh::Vertex &x)
+void PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis, const mesh::Vertex &x, Eigen::VectorXd &kernelVector)
 {
   const mesh::Mesh::VertexContainer& vertices = inputMesh.vertices();
   for (size_t j = 0; j < vertices.size(); j++)
@@ -124,73 +120,50 @@ void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(RADIAL_BASIS_FUN
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 template <typename IndexContainer>
-PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
-                                                      const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial)
+PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::PGreedyCholeskySolver(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
+                                                      const mesh::Mesh &outputMesh, const IndexContainer &outputIDs, std::vector<bool> deadAxis, Polynomial polynomial, 
+                                                      MappingConfiguration::GreedyParameter greedyParameter)
   : _inSize(inputMesh.vertices().size()), _outSize(outputMesh.vertices().size())
 {
-  precice::profiling::Event solveEvent("PGreedyCholesky.initialize", profiling::Synchronize);
-
-  //PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
-  PRECICE_ASSERT(RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite());
+  PRECICE_ASSERT(polynomial == Polynomial::OFF, "Poly off");
   PRECICE_ASSERT(_greedyIDs.empty());
   PRECICE_ASSERT(_kernelEval.size() == 0); 
 
-  _maxIter = (int) (0.2 * _inSize);
-
-  const int basisSize = std::min(static_cast<int>(_inSize), _maxIter); // maximal number of used basis functions
+  const int basisSize = std::min(_inSize, greedyParameter.maxIterations); // maximal number of used basis functions
   _powerFunction = Eigen::VectorXd(_inSize);
   _powerFunction.fill(basisFunction.evaluate(0));
   _basisMatrix = Eigen::MatrixXd::Zero(_inSize, basisSize);
-  _resultV = Eigen::MatrixXd::Zero(basisSize, basisSize);
+  _decomposedV = Eigen::MatrixXd::Zero(basisSize, basisSize);
   _greedyIDs.reserve(basisSize);
-  Eigen::VectorXd v(_inSize);
+
+  Eigen::VectorXd basisVector(_inSize);
 
   // Convert dead axis vector into an active axis array so that we can handle the reduction more easily
   std::array<bool, 3> activeAxis({{false, false, false}});
   std::transform(deadAxis.begin(), deadAxis.end(), activeAxis.begin(), [](const auto ax) { return !ax; });
 
-  int endN = 0; double endP = 0;
   // Iterative selection of new points
   for (int n = 0; n < basisSize; ++n) {
 
     auto [i, pMax] = select(inputMesh, basisFunction);
     auto x = inputMesh.vertices().at(i); 
+
+    if (pMax < greedyParameter.tolerance) break;
     _greedyIDs.push_back(i);
 
-    if (pMax < _tolP) break;
+    updateKernelVector(basisFunction, inputMesh, activeAxis, x, basisVector);
+    basisVector -= _basisMatrix.block(0, 0, _inSize, n) * _basisMatrix.block(i, 0, 1, n).transpose();
+    const double invP = 1.0 / std::sqrt(pMax);
+    basisVector *= invP;                 
 
-    updateKernelVector(basisFunction, inputMesh, activeAxis, v, x);
-    v -= _basisMatrix.block(0, 0, _inSize, n) * _basisMatrix.block(i, 0, 1, n).transpose(); 
-    v /= std::sqrt(pMax);                 
+    _powerFunction -= (Eigen::VectorXd) basisVector.array().square();
+    _basisMatrix.col(n) = basisVector;
+    _decomposedV.row(n) = _basisMatrix.row(i); // TODO: necessary?
 
-    _powerFunction -= (Eigen::VectorXd) v.array().square();
-    _basisMatrix.col(n) = v;
-
-    _resultV.row(n) = _basisMatrix.row(i); // TODO: Teste Cholesky
-
-    std::cout << "n=" << n << " von " << basisSize << ", P=" << pMax << "\r";
-    endN = n;
-    endP = pMax;
+    PRECICE_DEBUG("Iteration: {}, pMax = {}", n + 1, pMax);
   }
 
   _kernelEval = buildEvaluationMatrix(basisFunction, outputMesh, inputMesh, activeAxis);
-
-  solveEvent.stop();
-
-  //mesh::Mesh centerMesh("greedy-centers", inputMesh.getDimensions(), mesh::Mesh::MESH_ID_UNDEFINED);
-  //centerMesh.vertices() = _centers;
-  //io::ExportVTU exporter{"PGreedy", "exports", centerMesh, io::Export::ExportKind::TimeWindows, 1, /*Rank*/ 0, /*size*/ 1};
-  //exporter.doExport(0, 0.0);
-
-  const std::string filename = "/home/fabio/entwicklung/bachelorarbeit/turbine_test/PValue.txt";
-  std::ofstream pout;
-  pout.open(filename, std::fstream::in | std::fstream::out | std::fstream::app);
-
-  if(!pout) {
-    pout.open(filename, std::fstream::in | std::fstream::out | std::fstream::trunc);
-  }
-  pout << "n = " << endN << " (" << _inSize << "), P = " << endP << "\n";
-  pout.close();
 }
 
 
@@ -198,7 +171,7 @@ PGreedySolver<RADIAL_BASIS_FUNCTION_T>::PGreedySolver(RADIAL_BASIS_FUNCTION_T ba
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const
+Eigen::VectorXd PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const
 {
   // Not implemented
   PRECICE_ASSERT(false);
@@ -207,46 +180,43 @@ Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const 
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::VectorXd PGreedySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const
+Eigen::VectorXd PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const
 {
-  precice::profiling::Event solveEvent("PGreedyCholesky.solveConsistent", profiling::Synchronize);
+  size_t n = _greedyIDs.size();
+  Eigen::IndexedView y = inputData(_greedyIDs);
 
-  Eigen::VectorXd y = inputData(_greedyIDs);
+  
 
-  //_basisMatrix(_greedyIDs, Eigen::all); geht nicht
-
-  Eigen::VectorXd beta       = _resultV.triangularView<Eigen::Lower>().solve(y);
-  Eigen::VectorXd alpha      = _resultV.transpose().triangularView<Eigen::Upper>().solve(beta);
-  Eigen::VectorXd prediction = _kernelEval.transpose() * alpha;
-
-  solveEvent.stop();
+  Eigen::VectorXd interpolationCoeffs  = _decomposedV.block(0, 0, n, n).triangularView<Eigen::Lower>().solve(y);
+  _decomposedV.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>().solveInPlace(interpolationCoeffs);
+  Eigen::VectorXd prediction = _kernelEval.transpose() * interpolationCoeffs;
 
   return prediction;
 }
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void PGreedySolver<RADIAL_BASIS_FUNCTION_T>::clear()
+void PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::clear()
 {
   _greedyIDs.clear();
   _kernelEval    = Eigen::MatrixXd();
   _powerFunction = Eigen::VectorXd();
   _basisMatrix   = Eigen::MatrixXd();
-  _resultV       = Eigen::MatrixXd();
-  _inSize        = 0;
-  _outSize       = 0;
+  _decomposedV   = Eigen::MatrixXd();
+  _inSize  = 0;
+  _outSize = 0;
 }
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::Index PGreedySolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const
+Eigen::Index PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const
 {
   return _inSize;
 }
 
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::Index PGreedySolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const
+Eigen::Index PGreedyCholeskySolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const
 {
   return _outSize;
 }
