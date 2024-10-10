@@ -7,10 +7,9 @@
 #include "precice/impl/ParticipantImpl.hpp"
 #include "precice/precice.hpp"
 
-
-std::vector<int> generateMeshOne(precice::Participant &interface, const std::string &meshOneID) 
+std::vector<int> generateMeshOne(precice::Participant &interface, const std::string &meshOneID)
 {
-  const double z = 0.3;
+  const double     z = 0.3;
   std::vector<int> ids;
   ids.emplace_back(interface.setMeshVertex(meshOneID, Eigen::Vector3d{0.0, 0.0, z}));
   ids.emplace_back(interface.setMeshVertex(meshOneID, Eigen::Vector3d{1.0, 0.0, z}));
@@ -27,16 +26,15 @@ std::vector<int> generateMeshOne(precice::Participant &interface, const std::str
   return ids;
 }
 
-std::vector<int> generateMeshTwo(precice::Participant &interface, const std::string &meshTwoID) 
+std::vector<int> generateMeshTwo(precice::Participant &interface, const std::string &meshTwoID)
 {
-  const double z = 0.3;
+  const double     z = 0.3;
   std::vector<int> ids;
   ids.emplace_back(interface.setMeshVertex(meshTwoID, Eigen::Vector3d{0.0, 0.0, z}));
   ids.emplace_back(interface.setMeshVertex(meshTwoID, Eigen::Vector3d{0.5, 0.5, z}));
   ids.emplace_back(interface.setMeshVertex(meshTwoID, Eigen::Vector3d{3.5, 0.5, z}));
   return ids;
 }
-
 
 void testGreedyMappingDirection1(const std::string configFile, const TestContext &context)
 {
@@ -96,7 +94,6 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
       BOOST_TEST(values[i] == expectedValues[i], boost::test_tools::tolerance(1e-7));
     }
 
-
     // Verify that there is only one time step necessary.
     interface.advance(maxDt);
     BOOST_TEST(!interface.isCouplingOngoing(), "Receiving participant should have to advance once!");
@@ -104,33 +101,31 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
   }
 }
 
-
 void testGreedyMappingDirection2(const std::string configFile, const TestContext &context)
 {
   using Eigen::Vector3d;
 
   auto meshOneID = "MeshOne";
   auto meshTwoID = "MeshTwo";
-  auto dataAID = "DataOne";
+  auto dataAID   = "DataOne";
 
   std::vector<double> values;
   for (unsigned int i = 0; i < 3; ++i)
     values.emplace_back(std::pow(i + 1, 2));
 
   double expectedValues[12] = {
-    1,
-    0.29995768373298215,
-    0.296021056494793,
-    0.29995768373298215,
-    3.070337108988407e-05,
-    0.6749047883992098,
-    0.6749047883992098,
-    3.070266708867809e-05,
-    0.6749047883992098,
-    2.1342363350954833e-05,
-    2.1342363350954833e-05,
-    0.6749047883992098
-  };
+      1,
+      0.29995768373298215,
+      0.296021056494793,
+      0.29995768373298215,
+      3.070337108988407e-05,
+      0.6749047883992098,
+      0.6749047883992098,
+      3.070266708867809e-05,
+      0.6749047883992098,
+      2.1342363350954833e-05,
+      2.1342363350954833e-05,
+      0.6749047883992098};
 
   if (context.isNamed("SolverOne")) {
     precice::Participant interface("SolverOne", configFile, 0, 1);

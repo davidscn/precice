@@ -50,11 +50,11 @@ public:
   };
 
   struct GreedyParameter {
-    std::string  executor      = "reference-executor";
-    std::string  solver        = "greedy-solver";
-    std::string  subType       = "P-cholesky";
-    double       tolerance     = 1e-8;
-    std::size_t  maxIterations = 1e6;
+    std::string executor      = "reference-executor";
+    std::string solver        = "greedy-solver";
+    std::string subType       = "P-cholesky";
+    double      tolerance     = 1e-8;
+    std::size_t maxIterations = 1e6;
   };
 
   MappingConfiguration(
@@ -293,7 +293,7 @@ private:
                                        const std::string &polynomial,
                                        bool xDead, bool yDead, bool zDead,
                                        double solverRtol,
-                                       int maxIterations, // TODO: Greedy
+                                       int    maxIterations, // TODO: Greedy
                                        double verticesPerCluster,
                                        double relativeOverlap,
                                        bool   projectToInput) const;

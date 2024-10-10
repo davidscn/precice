@@ -9,6 +9,8 @@
 #include <variant>
 #include "logging/LogMacros.hpp"
 #include "mapping/AxialGeoMultiscaleMapping.hpp"
+#include "mapping/FGreedyCholeskySolver.hpp"
+#include "mapping/FGreedyCutSolver.hpp"
 #include "mapping/GinkgoRadialBasisFctSolver.hpp"
 #include "mapping/LinearCellInterpolationMapping.hpp"
 #include "mapping/Mapping.hpp"
@@ -16,9 +18,7 @@
 #include "mapping/NearestNeighborMapping.hpp"
 #include "mapping/NearestProjectionMapping.hpp"
 #include "mapping/PGreedyCholeskySolver.hpp"
-#include "mapping/FGreedyCholeskySolver.hpp"
 #include "mapping/PGreedyCutSolver.hpp"
-#include "mapping/FGreedyCutSolver.hpp"
 #include "mapping/PartitionOfUnityMapping.hpp"
 #include "mapping/PetRadialBasisFctMapping.hpp"
 #include "mapping/RadialBasisFctMapping.hpp"
@@ -212,8 +212,8 @@ MappingConfiguration::MappingConfiguration(
       XMLTag{*this, TYPE_RBF_GLOBAL_DIRECT, occ, TAG}.setDocumentation("Radial-basis-function mapping using a direct solver with a gather-scatter parallelism.")};
   std::list<XMLTag> rbfIterativeTags{
       XMLTag{*this, TYPE_RBF_GLOBAL_ITERATIVE, occ, TAG}.setDocumentation("Radial-basis-function mapping using an iterative solver with a distributed parallelism.")};
-  std::list<XMLTag> rbfGreedyTags{ // TODO: Greedy: Hier Tag für Typen erstellen
-      XMLTag{*this, TYPE_RBF_GREEDY, occ, TAG}.setDocumentation("Radial-basis-function mapping using P-Greedy.")};
+  std::list<XMLTag> rbfGreedyTags{// TODO: Greedy: Hier Tag für Typen erstellen
+                                  XMLTag{*this, TYPE_RBF_GREEDY, occ, TAG}.setDocumentation("Radial-basis-function mapping using P-Greedy.")};
   std::list<XMLTag> pumDirectTags{
       XMLTag{*this, TYPE_RBF_PUM_DIRECT, occ, TAG}.setDocumentation("Radial-basis-function mapping using a partition of unity method, which supports a distributed parallelism.")};
   std::list<XMLTag> rbfAliasTag{
@@ -467,7 +467,7 @@ void MappingConfiguration::xmlTagCallback(
 
     ConfiguredMapping configuredMapping = createMapping(dir, type, fromMesh, toMesh, geoMultiscaleType, geoMultiscaleAxis, multiscaleRadius);
 
-    _rbfConfig = configureRBFMapping(type, strPolynomial, xDead, yDead, zDead, solverRtol, solverMaxIter, verticesPerCluster, relativeOverlap, projectToInput);
+    _rbfConfig               = configureRBFMapping(type, strPolynomial, xDead, yDead, zDead, solverRtol, solverMaxIter, verticesPerCluster, relativeOverlap, projectToInput);
     _rbfConfig.greedySubType = greedySubType; // TODO: move into configureRBFMapping?
 
     checkDuplicates(configuredMapping);
@@ -525,7 +525,7 @@ MappingConfiguration::RBFConfiguration MappingConfiguration::configureRBFMapping
                                                                                  const std::string &polynomial,
                                                                                  bool xDead, bool yDead, bool zDead,
                                                                                  double solverRtol,
-                                                                                 int maxIterations,
+                                                                                 int    maxIterations,
                                                                                  double verticesPerCluster,
                                                                                  double relativeOverlap,
                                                                                  bool   projectToInput) const
@@ -558,8 +558,8 @@ MappingConfiguration::RBFConfiguration MappingConfiguration::configureRBFMapping
   else
     PRECICE_UNREACHABLE("Unknown polynomial configuration.");
 
-  rbfConfig.deadAxis   = {{xDead, yDead, zDead}};
-  rbfConfig.solverRtol = solverRtol;
+  rbfConfig.deadAxis      = {{xDead, yDead, zDead}};
+  rbfConfig.solverRtol    = solverRtol;
   rbfConfig.maxIterations = maxIterations;
 
   rbfConfig.verticesPerCluster = verticesPerCluster;
@@ -737,7 +737,7 @@ void MappingConfiguration::finishRBFConfiguration()
     if (_rbfConfig.solver == RBFConfiguration::SystemSolver::GlobalDirect) {
       mapping.mapping = getRBFMapping<RBFBackend::Eigen>(_rbfConfig.basisFunction, constraintValue, mapping.fromMesh->getDimensions(), _rbfConfig.supportRadius, _rbfConfig.shapeParameter, _rbfConfig.deadAxis, _rbfConfig.polynomial);
     } else if (_rbfConfig.solver == RBFConfiguration::SystemSolver::Greedy) {
-      _greedyParameter.tolerance = _rbfConfig.solverRtol;
+      _greedyParameter.tolerance     = _rbfConfig.solverRtol;
       _greedyParameter.maxIterations = _rbfConfig.maxIterations;
       if (_rbfConfig.greedySubType == "P-cholesky") {
         mapping.mapping = getRBFMapping<RBFBackend::PGreedyCholesky>(_rbfConfig.basisFunction, constraintValue, mapping.fromMesh->getDimensions(), _rbfConfig.supportRadius, _rbfConfig.shapeParameter, _rbfConfig.deadAxis, _rbfConfig.polynomial, _greedyParameter);
@@ -750,8 +750,7 @@ void MappingConfiguration::finishRBFConfiguration()
       } else {
         PRECICE_UNREACHABLE("Unknown greedy subtype.");
       }
-    }
-    else if (_rbfConfig.solver == RBFConfiguration::SystemSolver::GlobalIterative) {
+    } else if (_rbfConfig.solver == RBFConfiguration::SystemSolver::GlobalIterative) {
 #ifndef PRECICE_NO_PETSC
       // for petsc initialization
       utils::Petsc::initialize(utils::Parallel::current()->comm);
