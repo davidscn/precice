@@ -189,6 +189,10 @@ target_sources(testprecice
     tests/serial/map-initial-data/zero-data/ParallelWrite.cpp
     tests/serial/map-initial-data/zero-data/SerialRead.cpp
     tests/serial/map-initial-data/zero-data/SerialWrite.cpp
+    tests/serial/mapping-greedy-kernel/GreedyDirection1.cpp
+    tests/serial/mapping-greedy-kernel/GreedyDirection2.cpp
+    tests/serial/mapping-greedy-kernel/helpers.cpp
+    tests/serial/mapping-greedy-kernel/helpers.hpp
     tests/serial/mapping-nearest-neighbor-gradient/GradientTestBidirectionalReadScalar.cpp
     tests/serial/mapping-nearest-neighbor-gradient/GradientTestBidirectionalReadVector.cpp
     tests/serial/mapping-nearest-neighbor-gradient/GradientTestBidirectionalWriteScalar.cpp

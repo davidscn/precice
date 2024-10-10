@@ -49,6 +49,14 @@ public:
     bool         enableUnifiedMemory = false;
   };
 
+  struct GreedyParameter {
+    std::string executor      = "reference-executor";
+    std::string solver        = "greedy-solver";
+    std::string subType       = "P-cholesky";
+    double      tolerance     = 1e-8;
+    std::size_t maxIterations = 1e6;
+  };
+
   MappingConfiguration(
       xml::XMLTag &              parent,
       mesh::PtrMeshConfiguration meshConfiguration);
@@ -83,12 +91,14 @@ public:
     enum struct SystemSolver {
       GlobalDirect,
       GlobalIterative,
-      PUMDirect
+      PUMDirect,
+      Greedy
     };
     SystemSolver        solver{};
     std::array<bool, 3> deadAxis{};
     Polynomial          polynomial{};
     double              solverRtol{};
+    int                 maxIterations{}; //TODO: Greedy
     int                 verticesPerCluster{};
     double              relativeOverlap{};
     bool                projectToInput{};
@@ -96,6 +106,7 @@ public:
     double              supportRadius{};
     double              shapeParameter{};
     bool                basisFunctionDefined = false;
+    std::string         greedySubType{}; //TODO: Greedy
   };
 
   struct GeoMultiscaleConfiguration {
@@ -132,6 +143,7 @@ private:
   const std::string TYPE_LINEAR_CELL_INTERPOLATION   = "linear-cell-interpolation";
   const std::string TYPE_RBF_GLOBAL_DIRECT           = "rbf-global-direct";
   const std::string TYPE_RBF_GLOBAL_ITERATIVE        = "rbf-global-iterative";
+  const std::string TYPE_RBF_GREEDY                  = "rbf-greedy"; // TODO: Geedy-Typ String Definition
   const std::string TYPE_RBF_PUM_DIRECT              = "rbf-pum-direct";
   const std::string TYPE_RBF_ALIAS                   = "rbf";
   const std::string TYPE_AXIAL_GEOMETRIC_MULTISCALE  = "axial-geometric-multiscale";
@@ -215,7 +227,10 @@ private:
   // const std::string ATTR_USE_PRECONDITIONER    = "use-preconditioner";
   // const std::string ATTR_PRECONDITIONER        = "preconditioner";
   // const std::string ATTR_JACOBI_BLOCK_SIZE     = "jacobi-block-size";
-  // const std::string ATTR_MAX_ITERATIONS        = "max-iterations";
+
+  // Experimantal greedy attributes
+  const std::string ATTR_MAX_ITERATIONS = "max-iterations";
+  const std::string ATTR_GREEDY_SUBTYPE = "greedy-type";
 
   // mapping constraint
   Mapping::Constraint constraintValue{};
@@ -248,6 +263,9 @@ private:
   // Settings for the iterative solvers provided by Ginkgo
   GinkgoParameter _ginkgoParameter;
 
+  // Greedy solver Settings
+  GreedyParameter _greedyParameter;
+
   /**
    * Configures and instantiates all mappings, which do not require
    * a subtag/ a basis function. For the RBF related mappings, this class
@@ -275,6 +293,7 @@ private:
                                        const std::string &polynomial,
                                        bool xDead, bool yDead, bool zDead,
                                        double solverRtol,
+                                       int    maxIterations, // TODO: Greedy
                                        double verticesPerCluster,
                                        double relativeOverlap,
                                        bool   projectToInput) const;
