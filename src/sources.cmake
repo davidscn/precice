@@ -184,6 +184,7 @@ target_sources(preciceCore
     src/mapping/LinearCellInterpolationMapping.hpp
     src/mapping/Mapping.cpp
     src/mapping/Mapping.hpp
+    src/mapping/MathHelper.hpp
     src/mapping/NearestNeighborBaseMapping.cpp
     src/mapping/NearestNeighborBaseMapping.hpp
     src/mapping/NearestNeighborGradientMapping.cpp
@@ -250,6 +251,7 @@ target_sources(preciceCore
     src/partition/ReceivedPartition.cpp
     src/partition/ReceivedPartition.hpp
     src/partition/SharedPointer.hpp
+    src/precice/Exceptions.hpp
     src/precice/Participant.cpp
     src/precice/Participant.hpp
     src/precice/Tooling.cpp
@@ -354,6 +356,7 @@ target_sources(preciceCore
 
 set_property(TARGET precice PROPERTY PUBLIC_HEADER
     ${PROJECT_BINARY_DIR}/src/precice/Version.h
+    src/precice/Exceptions.hpp
     src/precice/Participant.hpp
     src/precice/Tooling.hpp
     src/precice/Types.hpp

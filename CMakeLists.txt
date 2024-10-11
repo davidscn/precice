@@ -64,6 +64,7 @@ option(PRECICE_ALWAYS_VALIDATE_LIBS "Validate libraries even after the validatat
 option(PRECICE_BINDINGS_C "Enable the native C bindings" ON)
 option(PRECICE_BINDINGS_FORTRAN "Enable the native Fortran bindings" ON)
 option(PRECICE_BUILD_TOOLS "Build the \"precice-tools\" executable" ON)
+option(PRECICE_BUILD_UNITY "Use unity builds in preCICE" ON)
 option(PRECICE_FEATURE_LIBBACKTRACE_STACKTRACES "Enable libbacktrace for stacktrace generation." OFF)
 
 option(CMAKE_INTERPROCEDURAL_OPTIMIZATION "Enable interprocedural optimization for all targets." OFF)
@@ -223,12 +224,6 @@ if (PRECICE_FEATURE_MPI_COMMUNICATION)
 
   find_package(MPI REQUIRED)
   message(STATUS "MPI Version: ${MPI_CXX_LIBRARY_VERSION_STRING}")
-
-  # We need to disable the MPIPorts tests in case we detect Open MPI
-  if(MPI_CXX_LIBRARY_VERSION_STRING MATCHES "Open MPI")
-    set(PRECICE_MPI_OPENMPI TRUE CACHE BOOL "Is the MPI implementation OpenMPI?" FORCE)
-    mark_as_advanced(PRECICE_MPI_OPENMPI)
-  endif()
 endif()
 
 # Option: PETSC
@@ -273,14 +268,6 @@ if (PRECICE_FEATURE_GINKGO_MAPPING)
     if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
       set(CMAKE_CUDA_ARCHITECTURES OFF)
     endif()
-  # Check the Kokkos version
-  if (Kokkos_VERSION VERSION_LESS 4.4)
-    set(KOKKOS_VERSION_BELOW_4_4 TRUE)
-  else()
-    set(KOKKOS_VERSION_BELOW_4_4 FALSE)
-  endif()
-else()
-  set(KOKKOS_VERSION_BELOW_4_4 FALSE)
 endif()
 
   # 2. Check if Ginkgo was built with HIP and if HIP is available on the system
@@ -361,15 +348,13 @@ set_target_properties(preciceCore PROPERTIES
   CXX_STANDARD_REQUIRED Yes
   CXX_EXTENSIONS No
   POSITION_INDEPENDENT_CODE YES
-  CXX_VISIBILITY_PRESET default
-  VISIBILITY_INLINES_HIDDEN NO
   )
 
-if(NOT ${Kokkos_VERSION} VERSION_LESS 4.4)
-set_target_properties(preciceCore PROPERTIES
-  CXX_VISIBILITY_PRESET hidden
-  VISIBILITY_INLINES_HIDDEN YES
-)
+if(NOT Kokkos_VERSION OR NOT Kokkos_VERSION VERSION_LESS 4.4)
+  set_target_properties(preciceCore PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN YES
+  )
 endif()
 
 # Setup release override options
@@ -406,22 +391,8 @@ if(PRECICE_FEATURE_LIBBACKTRACE_STACKTRACES)
   target_link_libraries(preciceCore PRIVATE internal::libbacktrace)
 endif()
 
-# Force Intel to honor nan and infinite in every floating point mode
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
-  # Compiler ID is supported after CMake 3.20
-  target_compile_options(preciceCore PUBLIC $<$<CXX_COMPILER_ID:IntelLLVM>:-fhonor-infinities -fhonor-nans>)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  # Compiler ID is supported after CMake 3.20 and IntelLLVM shows up as LLVM
-  # We need to inspect the version
-  execute_process(
-      COMMAND ${CMAKE_CXX_COMPILER} --version
-      OUTPUT_VARIABLE PRECICE_CXX_COMPILER_VERSION
-  )
-  mark_as_advanced(PRECICE_CXX_COMPILER_VERSION)
-  if(PRECICE_CXX_COMPILER_VERSION MATCHES "Intel.+oneAPI DPC")
-    target_compile_options(preciceCore PUBLIC -fhonor-infinities -fhonor-nans)
-  endif()
-endif()
+# Force Intel compiler to honor nan and infinite and use value-preserving floating point mode
+target_compile_options(preciceCore PUBLIC $<$<CXX_COMPILER_ID:IntelLLVM>:-fhonor-infinities -fhonor-nans -fp-model=precise>)
 
 # Setup Eigen3
 target_link_libraries(preciceCore PUBLIC Eigen3::Eigen)
@@ -517,11 +488,11 @@ set_target_properties(precice PROPERTIES
   VISIBILITY_INLINES_HIDDEN NO
   )
 
-  if(NOT ${Kokkos_VERSION} VERSION_LESS 4.4)
-set_target_properties(precice PROPERTIES
-  CXX_VISIBILITY_PRESET hidden
-  VISIBILITY_INLINES_HIDDEN YES
- )
+if(NOT Kokkos_VERSION OR NOT Kokkos_VERSION VERSION_LESS 4.4)
+  set_target_properties(precice PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN YES
+   )
 endif()
 
 
@@ -537,11 +508,31 @@ target_link_libraries(precice PRIVATE preciceCore)
 include(${CMAKE_CURRENT_LIST_DIR}/src/sources.cmake)
 
 # File Configuration
-include(GenerateVersionInformation)
-include(${CMAKE_CURRENT_LIST_DIR}/cmake/DetectGitRevision.cmake)
 configure_file("${PROJECT_SOURCE_DIR}/src/precice/impl/versions.hpp.in" "${PROJECT_BINARY_DIR}/src/precice/impl/versions.hpp" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/testing/SourceLocation.hpp.in" "${PROJECT_BINARY_DIR}/src/testing/SourceLocation.hpp" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/precice/Version.h.in" "${PROJECT_BINARY_DIR}/src/precice/Version.h" @ONLY)
+
+if(PRECICE_BUILD_UNITY)
+  set_target_properties(preciceCore PROPERTIES
+    UNITY_BUILD Yes
+    UNITY_BUILD_MODE GROUP
+  )
+  get_target_property(_precice_sources preciceCore SOURCES)
+  foreach(SOURCE_FILE IN LISTS _precice_sources)
+    if(SOURCE_FILE MATCHES "^src/([a-z0-9]+)/")
+      set_source_files_properties(${SOURCE_FILE} PROPERTIES UNITY_GROUP "${CMAKE_MATCH_1}")
+    endif()
+  endforeach()
+  unset(_precice_sources)
+endif()
+
+# Configure version file generation
+include(GenerateVersionInformation)
+# Configure CMake variables only. The result contains a placeholder for the git revision
+configure_file("${PROJECT_SOURCE_DIR}/src/precice/impl/versions.cpp.in" "${PROJECT_BINARY_DIR}/src/precice/impl/versions.cpp.in" @ONLY)
+# Dynamically replace the git revision information.
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/DetectGitRevision.cmake)
+
 
 # Setup export header
 include(GenerateExportHeader)
@@ -596,6 +587,21 @@ IF (BUILD_TESTING)
   # Test Sources Configuration
   include(${CMAKE_CURRENT_LIST_DIR}/src/tests.cmake)
   include(${CMAKE_CURRENT_LIST_DIR}/tests/tests.cmake)
+
+  if(PRECICE_BUILD_UNITY)
+    set_target_properties(testprecice PROPERTIES
+      UNITY_BUILD Yes
+      UNITY_BUILD_MODE GROUP
+      )
+    # Add integration tests from tests/ sources to a single unity group
+    get_target_property(_testprecice_sources testprecice SOURCES)
+    foreach(SOURCE_FILE IN LISTS _testprecice_sources)
+      if(SOURCE_FILE MATCHES "^tests/")
+        set_source_files_properties(${SOURCE_FILE} PROPERTIES UNITY_GROUP "integration")
+      endif()
+    endforeach()
+  endif()
+
 else(BUILD_TESTING)
   message(STATUS "Excluding test sources")
 endif(BUILD_TESTING)

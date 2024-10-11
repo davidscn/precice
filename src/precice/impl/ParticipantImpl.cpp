@@ -88,13 +88,15 @@ ParticipantImpl::ParticipantImpl(
       _accessorCommunicatorSize(solverProcessSize)
 {
 
-  PRECICE_CHECK(!communicator || communicator.value() != nullptr,
-                "Passing \"nullptr\" as \"communicator\" to Participant constructor is not allowed. "
-                "Please use the Participant constructor without the \"communicator\" argument, if you don't want to pass an MPI communicator.");
   PRECICE_CHECK(!_accessorName.empty(),
                 "This participant's name is an empty string. "
                 "When constructing a preCICE interface you need to pass the name of the "
                 "participant as first argument to the constructor.");
+  logging::setParticipant(_accessorName);
+
+  PRECICE_CHECK(!communicator || communicator.value() != nullptr,
+                "Passing \"nullptr\" as \"communicator\" to Participant constructor is not allowed. "
+                "Please use the Participant constructor without the \"communicator\" argument, if you don't want to pass an MPI communicator.");
   PRECICE_CHECK(_accessorProcessRank >= 0,
                 "The solver process index needs to be a non-negative number, not: {}. "
                 "Please check the value given when constructing a preCICE interface.",
@@ -117,9 +119,18 @@ ParticipantImpl::ParticipantImpl(
   } else {
     utils::Parallel::initializeOrDetectMPI();
   }
-#endif
 
-  logging::setParticipant(_accessorName);
+  {
+    const auto currentRank = utils::Parallel::current()->rank();
+    PRECICE_CHECK(_accessorProcessRank == currentRank,
+                  "The solver process index given in the preCICE interface constructor({}) does not match the rank of the passed MPI communicator ({}).",
+                  _accessorProcessRank, currentRank);
+    const auto currentSize = utils::Parallel::current()->size();
+    PRECICE_CHECK(_accessorCommunicatorSize == currentSize,
+                  "The solver process size given in the preCICE interface constructor({}) does not match the size of the passed MPI communicator ({}).",
+                  _accessorCommunicatorSize, currentSize);
+  }
+#endif
 
   profiling::EventRegistry::instance().initialize(_accessorName, _accessorProcessRank, _accessorCommunicatorSize);
   profiling::applyDefaults();
@@ -139,19 +150,6 @@ ParticipantImpl::ParticipantImpl(
   if (utils::IntraComm::isParallel()) {
     initializeIntraCommunication();
   }
-
-  // This block cannot be merged with the one above as it only configures calls
-  // utils::Parallel::initializeMPI, which is needed for getProcessRank.
-#ifndef PRECICE_NO_MPI
-  const auto currentRank = utils::Parallel::current()->rank();
-  PRECICE_CHECK(_accessorProcessRank == currentRank,
-                "The solver process index given in the preCICE interface constructor({}) does not match the rank of the passed MPI communicator ({}).",
-                _accessorProcessRank, currentRank);
-  const auto currentSize = utils::Parallel::current()->size();
-  PRECICE_CHECK(_accessorCommunicatorSize == currentSize,
-                "The solver process size given in the preCICE interface constructor({}) does not match the size of the passed MPI communicator ({}).",
-                _accessorCommunicatorSize, currentSize);
-#endif
 
   e.stop();
   sep.pop();
@@ -1155,10 +1153,11 @@ void ParticipantImpl::setMeshAccessRegion(
   PRECICE_REQUIRE_MESH_USE(meshName);
   PRECICE_CHECK(_state != State::Finalized, "setMeshAccessRegion() cannot be called after finalize().");
   PRECICE_CHECK(_state != State::Initialized, "setMeshAccessRegion() needs to be called before initialize().");
-  PRECICE_CHECK(!_accessRegionDefined, "setMeshAccessRegion may only be called once.");
 
   // Get the related mesh
-  MeshContext & context = _accessor->meshContext(meshName);
+  MeshContext &context = _accessor->meshContext(meshName);
+
+  PRECICE_CHECK(!context.accessRegionDefined, "A mesh access region was already defined for mesh \"{}\". setMeshAccessRegion may only be called once per mesh.", context.mesh->getName());
   mesh::PtrMesh mesh(context.mesh);
   int           dim = mesh->getDimensions();
   PRECICE_CHECK(boundingBox.size() == static_cast<unsigned long>(dim) * 2,
@@ -1181,7 +1180,7 @@ void ParticipantImpl::setMeshAccessRegion(
   // Expand the mesh associated bounding box
   mesh->expandBoundingBox(providedBoundingBox);
   // and set a flag so that we know the function was called
-  _accessRegionDefined = true;
+  context.accessRegionDefined = true;
 }
 
 void ParticipantImpl::getMeshVertexIDsAndCoordinates(
