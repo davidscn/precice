@@ -9,14 +9,14 @@
 #include <variant>
 #include "logging/LogMacros.hpp"
 #include "mapping/AxialGeoMultiscaleMapping.hpp"
-#include "mapping/FGreedyCholeskySolver.hpp"
-#include "mapping/FGreedyCutSolver.hpp"
 #include "mapping/GinkgoRadialBasisFctSolver.hpp"
 #include "mapping/LinearCellInterpolationMapping.hpp"
 #include "mapping/Mapping.hpp"
 #include "mapping/NearestNeighborGradientMapping.hpp"
 #include "mapping/NearestNeighborMapping.hpp"
 #include "mapping/NearestProjectionMapping.hpp"
+#include "mapping/FGreedyCholeskyMapping.hpp"
+#include "mapping/FGreedyCutSolver.hpp"
 #include "mapping/PGreedyCholeskySolver.hpp"
 #include "mapping/PGreedyCutSolver.hpp"
 #include "mapping/PartitionOfUnityMapping.hpp"
@@ -94,7 +94,7 @@ struct BackendSelector<RBFBackend::FGreedyCut, RBF> {
 };
 template <typename RBF>
 struct BackendSelector<RBFBackend::FGreedyCholesky, RBF> {
-  typedef mapping::RadialBasisFctMapping<FGreedyCholeskySolver<RBF>, MappingConfiguration::GreedyParameter> type;
+  typedef mapping::FGreedyCholeskyMapping<RBF> type;
 };
 template <typename RBF>
 struct BackendSelector<RBFBackend::PGreedyCut, RBF> {

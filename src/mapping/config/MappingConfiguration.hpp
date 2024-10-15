@@ -50,7 +50,7 @@ public:
   };
 
   struct GreedyParameter {
-    std::string executor      = "reference-executor";
+    std::string executor      = "reference-executor"; // TODO: modify to fit RadialBasisFctMapping::getName()
     std::string solver        = "greedy-solver";
     std::string subType       = "P-cholesky";
     double      tolerance     = 1e-8;
@@ -100,7 +100,7 @@ public:
     double              solverRtol{};
     int                 maxIterations{}; //TODO: Greedy
     int                 verticesPerCluster{};
-    double              relativeOverlap{};
+    double              relativeOverlap{}; 
     bool                projectToInput{};
     BasisFunction       basisFunction{};
     double              supportRadius{};

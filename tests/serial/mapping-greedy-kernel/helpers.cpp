@@ -41,10 +41,18 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
   using Eigen::Vector3d;
 
   std::vector<double> values;
-  for (unsigned int i = 0; i < 12; ++i)
+  for (unsigned int i = 0; i < 12; ++i) {
     values.emplace_back(std::pow(i + 1, 2));
+    values.emplace_back(i + 1);
+    values.emplace_back(1.0);
+  }
 
-  double expectedValues[3] = {1.0000000000000002, 2.1879131472090689, 22.859664317930537};
+
+  double expectedValues[9] = {
+    1.0000000000000002, 1,                  1,
+    2.187913147209069,  0.7361819229699296, 0.2957923081147373,
+    22.859664317930537, 2.507197240750358,  0.29496764858906593
+  };
 
   if (context.isNamed("SolverOne")) {
     precice::Participant interface("SolverOne", configFile, 0, 1);
@@ -87,10 +95,10 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
     auto dataAID = "DataOne";
     BOOST_TEST(!interface.requiresGradientDataFor(meshTwoID, dataAID));
 
-    double values[3];
+    double values[9];
     interface.readData(meshTwoID, dataAID, ids, maxDt, values);
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 9; i++) {
       BOOST_TEST(values[i] == expectedValues[i], boost::test_tools::tolerance(1e-7));
     }
 
