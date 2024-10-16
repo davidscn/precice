@@ -15,10 +15,6 @@
 #include "mapping/NearestNeighborGradientMapping.hpp"
 #include "mapping/NearestNeighborMapping.hpp"
 #include "mapping/NearestProjectionMapping.hpp"
-#include "mapping/FGreedyCholeskyMapping.hpp"
-#include "mapping/FGreedyCutSolver.hpp"
-#include "mapping/PGreedyCholeskySolver.hpp"
-#include "mapping/PGreedyCutSolver.hpp"
 #include "mapping/PartitionOfUnityMapping.hpp"
 #include "mapping/PetRadialBasisFctMapping.hpp"
 #include "mapping/RadialBasisFctMapping.hpp"
@@ -35,6 +31,13 @@
 #include "xml/ConfigParser.hpp"
 #include "xml/XMLAttribute.hpp"
 #include "xml/XMLTag.hpp"
+
+#include "mapping/FGreedyCholeskyMapping.hpp"
+#include "mapping/FGreedyCutMapping.hpp"
+#include "mapping/FGreedyCutSolver.hpp"
+#include "mapping/PGreedyCholeskySolver.hpp"
+#include "mapping/PGreedyCutSolver.hpp"
+
 namespace precice::mapping {
 
 namespace {
@@ -90,7 +93,7 @@ struct BackendSelector<RBFBackend::Eigen, RBF> {
 // Specialization for the RBF Greedy backend
 template <typename RBF>
 struct BackendSelector<RBFBackend::FGreedyCut, RBF> {
-  typedef mapping::RadialBasisFctMapping<FGreedyCutSolver<RBF>, MappingConfiguration::GreedyParameter> type;
+  typedef mapping::FGreedyCutMapping<RBF> type;
 };
 template <typename RBF>
 struct BackendSelector<RBFBackend::FGreedyCholesky, RBF> {
@@ -739,6 +742,7 @@ void MappingConfiguration::finishRBFConfiguration()
     } else if (_rbfConfig.solver == RBFConfiguration::SystemSolver::Greedy) {
       _greedyParameter.tolerance     = _rbfConfig.solverRtol;
       _greedyParameter.maxIterations = _rbfConfig.maxIterations;
+      _greedyParameter.executor      = _rbfConfig.greedySubType + "-cpu-executor";
       if (_rbfConfig.greedySubType == "P-cholesky") {
         mapping.mapping = getRBFMapping<RBFBackend::PGreedyCholesky>(_rbfConfig.basisFunction, constraintValue, mapping.fromMesh->getDimensions(), _rbfConfig.supportRadius, _rbfConfig.shapeParameter, _rbfConfig.deadAxis, _rbfConfig.polynomial, _greedyParameter);
       } else if (_rbfConfig.greedySubType == "P-cut") {

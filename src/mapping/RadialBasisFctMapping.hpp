@@ -183,6 +183,8 @@ std::string RadialBasisFctMapping<SOLVER_T, Args...>::getName() const
     std::string exec  = param.executor;
     if (param.solver == "qr-solver") {
       return "global-direct RBF (" + exec + ")";
+    } else if (param.solver == "greedy-solver") {
+      return "global-greedy RBF (" + exec + ")";
     } else {
       return "global-iterative RBF (" + exec + ")";
     }

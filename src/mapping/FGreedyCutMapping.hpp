@@ -1,5 +1,5 @@
 #pragma once
-
+#include <Eigen/Dense>
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
 #include <Eigen/SVD>
@@ -26,6 +26,8 @@ class FGreedyCutMapping : public RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION
 
   using RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION_T>::_basisFunction;
   using GreedyParameter = MappingConfiguration::GreedyParameter;
+  using VertexContainer = mesh::Mesh::VertexContainer;
+;
 
 public:
 
@@ -46,9 +48,6 @@ public:
   void clear() final override;
 
   std::string getName() const final override;
-
-  //void tagMeshFirstRound() final override;
-  //void tagMeshSecondRound() final override;
 
 private:
   precice::logging::Logger _log{"mapping::RadialBasisFctMapping"};
@@ -100,25 +99,22 @@ FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::FGreedyCutMapping(
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-std::pair<int, double> FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::select(const Eigen::MatrixXd &residual) const
-{
+std::pair<int, double> FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::select(const Eigen::MatrixXd &residual) const {
   Eigen::Index maxIndex;
   double       maxValue = residual.colwise().squaredNorm().maxCoeff(&maxIndex);
   return {maxIndex, maxValue};
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(const std::vector<int> &greedyIDs) const
-{
-  const mesh::Mesh::VertexContainer &inputVertices  = _inputMesh->vertices();
-  const mesh::Mesh::VertexContainer &outputVertices = _outputMesh->vertices();
+Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(const std::vector<int> &greedyIDs) const {
+
+  const VertexContainer &inputVertices  = _inputMesh->vertices();
+  const VertexContainer &outputVertices = _outputMesh->vertices();
   Eigen::MatrixXd matrixA(greedyIDs.size(), outputVertices.size());
 
-  for (size_t i = 0; i < greedyIDs.size(); i++) 
-  {
+  for (size_t i = 0; i < greedyIDs.size(); i++) {
     const auto &u = inputVertices.at(greedyIDs.at(i)).rawCoords();
-    for (size_t j = 0; j < outputVertices.size(); j++) 
-    {
+    for (size_t j = 0; j < outputVertices.size(); j++) {
       const auto & v = outputVertices.at(j).rawCoords();
       const double d = computeSquaredDifference(u, v, _activeAxis);
       matrixA(i, j)  = _basisFunction.evaluate(std::sqrt(d));
@@ -128,41 +124,40 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatri
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::recalculateResidual(const Eigen::MatrixXd &inputData, Eigen::MatrixXd &interpolationCoeffs, Eigen::MatrixXd &residual)
-{
-  const mesh::Mesh::VertexContainer &inputVertices = _inputMesh->vertices();
+void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::recalculateResidual(const Eigen::MatrixXd &inputData, Eigen::MatrixXd &interpolationCoeffs, Eigen::MatrixXd &residual) {
 
-  int         n = _greedyIDs.size();
+  const VertexContainer &inputVertices = _inputMesh->vertices();
+
+  const int   n = _greedyIDs.size();
   const auto &v = inputVertices.at(_greedyIDs.at(n - 1)).rawCoords();
 
-  for (size_t i = 0; i < _inSize; i++) 
-  {
+  for (size_t i = 0; i < _inSize; i++) {
     const auto & u          = inputVertices.at(i).rawCoords();
     const double d          = computeSquaredDifference(u, v, _activeAxis);
     _kernelMatrix(i, n - 1) = _basisFunction.evaluate(std::sqrt(d));
   }
-  const Eigen::IndexedView y = inputData(Eigen::all, _greedyIDs).transpose();
-  const Eigen::MatrixXd    a = _cut.block(n - 1, 0, 1, n) * y;
-  interpolationCoeffs.block(0, 0, n, inputData.rows()) += _cut.block(n - 1, 0, 1, n).transpose() * a;
+  const Eigen::MatrixXd cy = _cut.block(n - 1, 0, 1, n) * inputData(Eigen::all, _greedyIDs).transpose(); // TODO: temporary allocation during calculation?
+  interpolationCoeffs.block(0, 0, n, inputData.rows()) += _cut.block(n - 1, 0, 1, n).transpose() * cy;
   residual = (inputData - (_kernelMatrix.block(0, 0, _inSize, n) * interpolationCoeffs.block(0, 0, n, inputData.rows())).transpose()).cwiseAbs();
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vertex &x, Eigen::VectorXd &kernelVector) const
-{
-  const mesh::Mesh::VertexContainer &inputVertices = _inputMesh->vertices();
-  for (size_t j = 0; j < _greedyIDs.size(); j++) 
-  {
+void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vertex &x, Eigen::VectorXd &kernelVector) const {
+
+  const VertexContainer &inputVertices = _inputMesh->vertices();
+
+  for (size_t j = 0; j < _greedyIDs.size(); j++) {
     const auto &y   = inputVertices.at(_greedyIDs.at(j)).rawCoords();
     kernelVector(j) = _basisFunction.evaluate(std::sqrt(computeSquaredDifference(x.rawCoords(), y, _activeAxis)));
   }
 }
 
-
 template <typename RADIAL_BASIS_FUNCTION_T>
 void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   PRECICE_ASSERT(_greedyIDs.empty());
   PRECICE_ASSERT(_kernelEval.size() == 0);
+
+  precice::profiling::Event e("map.f-greedy-cut.computeMapping.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   if (this->hasConstraint(Mapping::CONSERVATIVE)) {
     _inputMesh  = this->output();
@@ -186,8 +181,10 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
 template <typename RADIAL_BASIS_FUNCTION_T>
 void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::Sample &inData, Eigen::VectorXd &outData) {
   
+  precice::profiling::Event e("map.f-greedy-cut.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
+
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  const Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, inData.values.size() / inData.dataDims); // TODO N x 3 better?
+  const Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _inSize);
 
   Eigen::MatrixXd residual               = inputData;
   Eigen::VectorXd kernelVectorOldCenters = Eigen::VectorXd::Ones(_basisSize);
@@ -200,17 +197,17 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::Sampl
   // Iterative selection of new points
   for (size_t n = 0; n < _basisSize; ++n) {
 
-    auto [i, fMax] = select(residual);
-    auto x         = _inputMesh->vertices().at(i);
+    const auto [i, fMax] = select(residual);
+    const auto x         = _inputMesh->vertices().at(i);
 
     updateKernelVector(x, kernelVectorOldCenters);
     basisVector.head(n)  = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * kernelVectorOldCenters.head(n);
     const double squareP = kernelDiagonal - basisVector.array().head(n).square().sum();
+    const double invP    = 1.0 / std::sqrt(squareP);
 
     if (fMax < _tolF || squareP <= 0)
       break;
     _greedyIDs.push_back(i);
-    const double invP = 1.0 / std::sqrt(squareP);
 
     _cut.block(n, 0, 1, n).noalias() = -basisVector.block(0, 0, n, 1).transpose() * _cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
     _cut(n, n)                       = 1;
@@ -221,9 +218,7 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::Sampl
     PRECICE_DEBUG("Iteration: {}, fMax = {}, P² = {}", n + 1, fMax, squareP);
   }
   const size_t n = _greedyIDs.size();
-
-  Eigen::MatrixXd kernelEval = buildEvaluationMatrix(_greedyIDs);
-  //Eigen::VectorXd prediction = kernelEval.transpose() * interpolationCoeffs.head(n);
+  const Eigen::MatrixXd kernelEval = buildEvaluationMatrix(_greedyIDs);
 
   for (int d = 0; d < inData.dataDims; d++) {
     outData(Eigen::seqN(d, _outSize, inData.dataDims)) = kernelEval.transpose() * interpolationCoeffs.col(d).head(n);
@@ -233,22 +228,24 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::Sampl
 template <typename RADIAL_BASIS_FUNCTION_T>
 void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConservative(const time::Sample &inData, Eigen::VectorXd &outData) {
 
+  precice::profiling::Event e("map.f-greedy-cut.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
+
 
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 std::string FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::getName() const {
-  return "f-greedy-cut"; // TODO: !!!!!!!!!!!!
+  return "global-greedy RBF (f-cut-cpu-executor)";
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::clear()
 {
-  _kernelEval  = Eigen::MatrixXd();
+  _kernelEval   = Eigen::MatrixXd();
   _kernelMatrix = Eigen::MatrixXd();
-  _cut = Eigen::MatrixXd();
-  _inSize      = 0;
-  _outSize     = 0;
+  _cut          = Eigen::MatrixXd();
+  _inSize       = 0;
+  _outSize      = 0;
 }
 
 
