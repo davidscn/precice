@@ -76,19 +76,17 @@ private:
 // ---- Implementations ---- //
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-std::pair<int, double> PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::select(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction)
-{
+std::pair<int, double> PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::select(const mesh::Mesh &inputMesh, RADIAL_BASIS_FUNCTION_T basisFunction) {
   Eigen::Index maxIndex;
   double       maxValue = _powerFunction.maxCoeff(&maxIndex);
   return {maxIndex, maxValue};
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::MatrixXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &outputMesh, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis)
-{
+Eigen::MatrixXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &outputMesh, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis) {
+  
   const mesh::Mesh::VertexContainer &inputVertices  = inputMesh.vertices();
   const mesh::Mesh::VertexContainer &outputVertices = outputMesh.vertices();
-
   Eigen::MatrixXd matrixA(_greedyIDs.size(), outputVertices.size());
 
   for (size_t i = 0; i < _greedyIDs.size(); i++) {
@@ -104,8 +102,8 @@ Eigen::MatrixXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::buildEvaluationMatrix
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis, Eigen::VectorXd &kernelVector, const mesh::Vertex &x)
-{
+void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis, Eigen::VectorXd &kernelVector, const mesh::Vertex &x) {
+  
   const mesh::Mesh::VertexContainer &vertices = inputMesh.vertices();
   for (size_t j = 0; j < _greedyIDs.size(); j++) {
     const auto &y   = vertices.at(_greedyIDs.at(j)).rawCoords();
@@ -114,8 +112,8 @@ void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(RADIAL_BASIS_
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::updatePowerFunction(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis)
-{
+void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::updatePowerFunction(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const std::array<bool, 3> &activeAxis) {
+
   const mesh::Mesh::VertexContainer &vertices = inputMesh.vertices();
   const size_t                       n        = _greedyIDs.size() - 1;
   const auto &                       y        = vertices.at(_greedyIDs.at(n)).rawCoords();
@@ -180,16 +178,14 @@ PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::PGreedyCutSolver(RADIAL_BASIS_FUNCTIO
 // ---- Evaluation ---- //
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::VectorXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const
-{
+Eigen::VectorXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::solveConservative(const Eigen::VectorXd &inputData, Polynomial polynomial) const {
   // Not implemented
   PRECICE_ASSERT(false);
   return Eigen::VectorXd();
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::VectorXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const
-{
+Eigen::VectorXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen::VectorXd &inputData, Polynomial polynomial) const {
   size_t             n          = _greedyIDs.size();
   Eigen::IndexedView y          = inputData(_greedyIDs);
   Eigen::VectorXd    prediction = _kernelEval.transpose() * (_cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * (_cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * y));
@@ -198,8 +194,7 @@ Eigen::VectorXd PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(Eigen
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::clear()
-{
+void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::clear() {
   _greedyIDs.clear();
   _kernelEval    = Eigen::MatrixXd();
   _kernelMatrix  = Eigen::MatrixXd();
@@ -210,14 +205,12 @@ void PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::clear()
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::Index PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const
-{
+Eigen::Index PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::getInputSize() const {
   return _inSize;
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-Eigen::Index PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const
-{
+Eigen::Index PGreedyCutSolver<RADIAL_BASIS_FUNCTION_T>::getOutputSize() const {
   return _outSize;
 }
 

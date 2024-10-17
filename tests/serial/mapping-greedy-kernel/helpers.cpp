@@ -36,7 +36,7 @@ std::vector<int> generateMeshTwo(precice::Participant &interface, const std::str
   return ids;
 }
 
-void testGreedyMappingDirection1(const std::string configFile, const TestContext &context)
+void testGreedyMappingDirection1(const std::string configFile, const TestContext &context, bool hasPolynomial)
 {
   using Eigen::Vector3d;
 
@@ -46,13 +46,22 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
     values.emplace_back(i + 1);
     values.emplace_back(1.0);
   }
+  
+  std::array<double, 9> expectedValues;
 
-
-  double expectedValues[9] = {
-    1.0000000000000002, 1,                  1,
-    2.187913147209069,  0.7361819229699296, 0.2957923081147373,
-    22.859664317930537, 2.507197240750358,  0.29496764858906593
-  };
+  if (hasPolynomial) {
+    expectedValues = {
+      1.0, 1.0, 1.0,
+      7.122923100052058, 2.7403930644287873, 1.0,
+      77.68795224048169, 8.379130618729382, 1.0
+    };
+  } else {
+    expectedValues = {
+      1.0000000000000002, 1.0,                1.0,
+      2.187913147209069,  0.7361819229699296, 0.2957923081147373,
+      22.859664317930537, 2.507197240750358,  0.29496764858906593
+    };
+  }
 
   if (context.isNamed("SolverOne")) {
     precice::Participant interface("SolverOne", configFile, 0, 1);
@@ -99,6 +108,7 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
     interface.readData(meshTwoID, dataAID, ids, maxDt, values);
 
     for (int i = 0; i < 9; i++) {
+      fmt::print("{} = {},\n", values[i], expectedValues[i]);
       BOOST_TEST(values[i] == expectedValues[i], boost::test_tools::tolerance(1e-7));
     }
 

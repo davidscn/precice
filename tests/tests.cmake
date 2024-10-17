@@ -194,6 +194,7 @@ target_sources(testprecice
     tests/serial/map-initial-data/zero-data/SerialWrite.cpp
     tests/serial/mapping-greedy-kernel/GreedyDirection1.cpp
     tests/serial/mapping-greedy-kernel/GreedyDirection2.cpp
+    tests/serial/mapping-greedy-kernel/GreedyPolynomial.cpp
     tests/serial/mapping-greedy-kernel/helpers.cpp
     tests/serial/mapping-greedy-kernel/helpers.hpp
     tests/serial/mapping-nearest-neighbor-gradient/GradientTestBidirectionalReadScalar.cpp

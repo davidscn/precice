@@ -145,7 +145,6 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vertex &x, Eigen::VectorXd &kernelVector) const {
 
   const VertexContainer &inputVertices = _inputMesh->vertices();
-
   for (size_t j = 0; j < _greedyIDs.size(); j++) {
     const auto &y   = inputVertices.at(_greedyIDs.at(j)).rawCoords();
     kernelVector(j) = _basisFunction.evaluate(std::sqrt(computeSquaredDifference(x.rawCoords(), y, _activeAxis)));
