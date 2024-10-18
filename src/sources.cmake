@@ -182,6 +182,7 @@ target_sources(preciceCore
     src/mapping/FGreedyCutSolver.hpp
     src/mapping/GinkgoDefinitions.hpp
     src/mapping/GinkgoRadialBasisFctSolver.hpp
+    src/mapping/GreedyMapping.hpp
     src/mapping/LinearCellInterpolationMapping.cpp
     src/mapping/LinearCellInterpolationMapping.hpp
     src/mapping/Mapping.cpp
@@ -195,7 +196,9 @@ target_sources(preciceCore
     src/mapping/NearestNeighborMapping.hpp
     src/mapping/NearestProjectionMapping.cpp
     src/mapping/NearestProjectionMapping.hpp
+    src/mapping/PGreedyCholeskyMapping.hpp
     src/mapping/PGreedyCholeskySolver.hpp
+    src/mapping/PGreedyCutMapping.hpp
     src/mapping/PGreedyCutSolver.hpp
     src/mapping/PartitionOfUnityMapping.hpp
     src/mapping/PetRadialBasisFctMapping.hpp

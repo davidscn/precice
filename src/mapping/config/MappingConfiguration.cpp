@@ -36,7 +36,9 @@
 #include "mapping/FGreedyCutMapping.hpp"
 #include "mapping/FGreedyCutSolver.hpp"
 #include "mapping/PGreedyCholeskySolver.hpp"
+#include "mapping/PGreedyCholeskyMapping.hpp"
 #include "mapping/PGreedyCutSolver.hpp"
+#include "mapping/PGreedyCutMapping.hpp"
 
 namespace precice::mapping {
 
@@ -101,11 +103,11 @@ struct BackendSelector<RBFBackend::FGreedyCholesky, RBF> {
 };
 template <typename RBF>
 struct BackendSelector<RBFBackend::PGreedyCut, RBF> {
-  typedef mapping::RadialBasisFctMapping<PGreedyCutSolver<RBF>, MappingConfiguration::GreedyParameter> type;
+  typedef mapping::PGreedyCutMapping<RBF> type;
 };
 template <typename RBF>
 struct BackendSelector<RBFBackend::PGreedyCholesky, RBF> {
-  typedef mapping::RadialBasisFctMapping<PGreedyCholeskySolver<RBF>, MappingConfiguration::GreedyParameter> type;
+  typedef mapping::PGreedyCholeskyMapping<RBF> type;
 };
 
 // Specialization for the PETSc RBF backend
