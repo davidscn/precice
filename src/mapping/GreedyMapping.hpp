@@ -186,7 +186,8 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCut(const time
 
   if (_usesPolynomial) {
     const Eigen::MatrixXd epsilon = _polyMatrixU.transpose() * y - _polyMatrixQ.transpose() * prediction;
-    prediction += _qrDecomposedQ.transpose().solve(epsilon);
+    const Eigen::MatrixXd polynomialContribution = _qrDecomposedQ.transpose().solve(epsilon);
+    prediction += polynomialContribution;
   }
   for (int d = 0; d < inData.dataDims; d++) {
     outData(Eigen::seqN(d, _inSize, inData.dataDims))(_greedyIDs) = prediction.col(d);
@@ -206,7 +207,8 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCholesky(const
 
   if (_usesPolynomial) {
     const Eigen::MatrixXd epsilon = _polyMatrixU.transpose() * y - _polyMatrixQ.transpose() * prediction;
-    prediction += _qrDecomposedQ.transpose().solve(epsilon);
+    const Eigen::MatrixXd polynomialContribution = _qrDecomposedQ.transpose().solve(epsilon);
+    prediction += polynomialContribution;
   }
   outData = Eigen::VectorXd::Zero(_inSize * inData.dataDims);
   for (int d = 0; d < inData.dataDims; d++) {
