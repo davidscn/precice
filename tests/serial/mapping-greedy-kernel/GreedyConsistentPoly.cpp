@@ -8,14 +8,14 @@
 BOOST_AUTO_TEST_SUITE(Integration)
 BOOST_AUTO_TEST_SUITE(Serial)
 BOOST_AUTO_TEST_SUITE(MappingGreedyKernel)
-BOOST_AUTO_TEST_CASE(GreedyDirection2)
+BOOST_AUTO_TEST_CASE(GreedyConsistentPoly)
 {
   /**
  * @brief Tests the Gaussian rbf mapping using the support radius option
  *
  */
   PRECICE_TEST("SolverOne"_on(1_rank), "SolverTwo"_on(1_rank));
-  testGreedyMappingDirection2(context.config(), context);
+  testGreedyMapping(context.config(), context, true, true);
 }
 
 BOOST_AUTO_TEST_SUITE_END() // Integration

@@ -36,7 +36,7 @@ std::vector<int> generateMeshTwo(precice::Participant &interface, const std::str
   return ids;
 }
 
-void testGreedyMappingDirection1(const std::string configFile, const TestContext &context, bool hasPolynomial)
+void testGreedyMapping(const std::string configFile, const TestContext &context, bool hasPolynomial, bool consistent)
 {
   using Eigen::Vector3d;
 
@@ -49,19 +49,31 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
   
   std::array<double, 9> expectedValues;
 
-  if (hasPolynomial) {
+  if (hasPolynomial && consistent) {
     expectedValues = {
-      1.0, 1.0, 1.0,
+      1.0,               1.0,                1.0,
       7.122923100052058, 2.7403930644287873, 1.0,
-      77.68795224048169, 8.379130618729382, 1.0
+      77.68795224048169, 8.379130618729382,  1.0
     };
-  } else {
+  } else if (hasPolynomial && !consistent) {
+    expectedValues = {
+      -156,               -11.999999999999993, 8.881784197001252e-16,
+      123.33333333333336, 18.666666666666675,  4.000000000000001,
+      682.6666666666666,  71.33333333333331,   7.999999999999999 
+    };
+  } else if (!hasPolynomial && consistent) {
     expectedValues = {
       1.0000000000000002, 1.0,                1.0,
       2.187913147209069,  0.7361819229699296, 0.2957923081147373,
       22.859664317930537, 2.507197240750358,  0.29496764858906593
     };
-  }
+  } else if (!hasPolynomial && !consistent) {
+    expectedValues = {
+      0.9493733896841857, 0.9831274404358147, 0.9943762300865595,
+      2.1787007195153207, 0.6762008797287633, 0.2253947287964186,
+      23.24745561515487,  2.5497209384363404, 0.299967169227804753
+    };
+  } 
 
   if (context.isNamed("SolverOne")) {
     precice::Participant interface("SolverOne", configFile, 0, 1);
@@ -104,10 +116,10 @@ void testGreedyMappingDirection1(const std::string configFile, const TestContext
     auto dataAID = "DataOne";
     BOOST_TEST(!interface.requiresGradientDataFor(meshTwoID, dataAID));
 
-    double values[9];
+    std::array<double, expectedValues.size()> values;
     interface.readData(meshTwoID, dataAID, ids, maxDt, values);
 
-    for (int i = 0; i < 9; i++) {
+    for (size_t i = 0; i < values.size(); i++) {
       fmt::print("{} = {},\n", values[i], expectedValues[i]);
       BOOST_TEST(values[i] == expectedValues[i], boost::test_tools::tolerance(1e-7));
     }

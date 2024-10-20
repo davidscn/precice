@@ -32,6 +32,7 @@
 #include "xml/XMLAttribute.hpp"
 #include "xml/XMLTag.hpp"
 
+#include "mapping/GreedyMapping.hpp"
 #include "mapping/FGreedyCholeskyMapping.hpp"
 #include "mapping/FGreedyCutMapping.hpp"
 #include "mapping/FGreedyCutSolver.hpp"

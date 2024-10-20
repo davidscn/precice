@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <precice-configuration>
-  <data:scalar name="DataOne" />
+  <data:vector name="DataOne" />
 
   <mesh name="MeshOne" dimensions="3">
     <use-data name="DataOne" />
@@ -22,7 +22,7 @@
       direction="read"
       from="MeshOne"
       to="MeshTwo"
-      constraint="consistent"
+      constraint="conservative"
       polynomial="off"
       solver-rtol="0"
       z-dead="false"

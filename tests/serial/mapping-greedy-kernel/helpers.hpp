@@ -7,7 +7,7 @@
 using namespace precice;
 using precice::testing::TestContext;
 
-void testGreedyMappingDirection1(const std::string configFile, const TestContext &context, bool hasPolynomial);
+void testGreedyMapping(const std::string configFile, const TestContext &context, bool hasPolynomial, bool consistent);
 void testGreedyMappingDirection2(const std::string configFile, const TestContext &context);
 
 #endif
