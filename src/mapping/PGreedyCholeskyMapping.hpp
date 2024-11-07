@@ -77,21 +77,30 @@ void PGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   precice::profiling::Event e("map.P-greedy-cholesky.computeMapping.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   super::computeMapping();
+
+  std::string path = "/home/fabio/entwicklung/bachelorarbeit/turbine_test/greedy.csv";
+  std::fstream file;
+  file.open(path, std::fstream::in | std::fstream::out | std::fstream::app);
   
-  _basisMatrix   = Eigen::MatrixXd::Zero(super::_inSize, super::_basisSize);
-  _choleskyA     = Eigen::MatrixXd::Zero(super::_basisSize,super::_basisSize);
+  _basisMatrix.resize(super::_inSize, super::_basisSize); // TODO: test carefully
   _powerFunction = Eigen::VectorXd(super::_inSize);
   _powerFunction.fill(_basisFunction.evaluate(0));
   Eigen::VectorXd basisVector(super::_inSize);
 
+  double pOut;
   // Iterative selection of new points
-  for (size_t n = 0; n < super::_basisSize; ++n) {
+  for (size_t n = 0; n < super::_maxIter; ++n) {
 
     auto [i, pMax] = super::select(_powerFunction);
     auto x         = super::_inputMesh->vertices().at(i);
 
-    if (pMax < super::_tolerance)
-      break;
+    if (pMax < super::_tolerance || n == super::_basisSize) {
+      if (pMax < super::_tolerance) 
+        break;
+      super::_basisSize += static_cast<size_t>(0.2 * super::_basisSize);
+      _basisMatrix.conservativeResize(super::_inSize, super::_basisSize);
+      PRECICE_DEBUG("\nRESIZE\n");
+    }
     super::_greedyIDs.push_back(i);
 
     super::updateKernelVector(x, boost::irange(0UL, super::_inSize), basisVector);
@@ -101,10 +110,15 @@ void PGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
 
     _powerFunction -= (Eigen::VectorXd) basisVector.array().square();
     _basisMatrix.col(n) = basisVector;
-    _choleskyA.row(n) = _basisMatrix.row(i); // TODO: necessary?
 
+    pOut = pMax;
     PRECICE_DEBUG("Iteration: {}, pMax = {}", n + 1, pMax);
   }
+  file << "P-greedy-c2-" << super::_maxIter << "," << super::_inSize << "," << super::_greedyIDs.size() << "," << std::sqrt(pOut) << "\n";
+  file.close();
+
+  _choleskyA   = _basisMatrix(super::_greedyIDs, Eigen::seqN(0, super::_greedyIDs.size()));
+  _basisMatrix = Eigen::MatrixXd();
 
   super::fillEvaluationMatrix();
   if (super::_usesPolynomial) {

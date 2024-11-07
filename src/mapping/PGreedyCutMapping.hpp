@@ -97,13 +97,22 @@ void PGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   Eigen::VectorXd basisVector  = Eigen::VectorXd::Ones(super::_basisSize);
 
   // Iterative selection of new points
-  for (size_t n = 0; n < super::_basisSize; ++n) {
+  for (size_t n = 0; n < super::_maxIter; ++n) {
 
     auto [i, pMax] = super::select(_powerFunction);
     auto x         = super::_inputMesh->vertices().at(i);
 
-    if (pMax < super::_tolerance)
-      break;
+    if (pMax < super::_tolerance || n == super::_basisSize - 1) {
+      if (pMax < super::_tolerance) 
+        break;
+      super::_basisSize += static_cast<size_t>(0.2 * super::_basisSize);
+      _kernelMatrix.conservativeResize(super::_inSize, super::_basisSize);
+      _cut.conservativeResize(super::_basisSize, super::_basisSize);
+      _cut.block(0, n + 1, super::_basisSize, super::_basisSize - n - 1) = Eigen::MatrixXd::Zero(super::_basisSize, super::_basisSize - n - 1);
+      kernelVector.conservativeResize(super::_basisSize);
+      basisVector.conservativeResize(super::_basisSize);
+      PRECICE_DEBUG("Resizing matrices\n");
+    }
     const double invP = 1.0 / std::sqrt(pMax);
 
     super::updateKernelVector(x, super::_greedyIDs, kernelVector);

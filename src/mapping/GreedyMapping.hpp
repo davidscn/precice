@@ -78,6 +78,8 @@ protected:
   void solveConsistentWithCut(const time::Sample &inData, const Eigen::MatrixXd &cut, Eigen::VectorXd &outData) const;
   void solveConservativeWithCholesky(const time::Sample &inData, const Eigen::MatrixXd &choleskyA, Eigen::VectorXd &outData) const;
   void solveConsistentWithCholesky(const time::Sample &inData, const Eigen::MatrixXd &choleskyA, Eigen::VectorXd &outData) const;
+
+  size_t estimateNumberOfCenters();
 };
 
 
@@ -104,6 +106,8 @@ GreedyMapping<RADIAL_BASIS_FUNCTION_T>::GreedyMapping(
 template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::fillPolynomialMatrices() {
 
+  precice::profiling::Event e("fillPolynomialMatrices", profiling::Synchronize);
+
   unsigned int polyParams = 4 - std::count(_activeAxis.begin(), _activeAxis.end(), false);
   _polyMatrixQ.resize(_greedyIDs.size(), polyParams);
   fillPolynomialEntries(_polyMatrixQ, *_inputMesh, _greedyIDs, 0, _activeAxis);
@@ -115,6 +119,8 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::fillPolynomialMatrices() {
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::fillEvaluationMatrix() {
+
+  precice::profiling::Event e("fillEvaluationMatrix", profiling::Synchronize);
 
   const mesh::Mesh::VertexContainer &inputVertices  = _inputMesh->vertices();
   const mesh::Mesh::VertexContainer &outputVertices = _outputMesh->vertices();
@@ -134,6 +140,8 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 template<typename IndexContainer>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vertex &x, const IndexContainer &ids, Eigen::VectorXd &kernelVector) const {
 
+  precice::profiling::Event e("updateKernelVector", profiling::Synchronize);
+
   const mesh::Mesh::VertexContainer &inputVertices = _inputMesh->vertices();
   for (const auto &j : ids | boost::adaptors::indexed()) {
     const auto &y   = inputVertices.at(j.value()).rawCoords();
@@ -142,20 +150,27 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vert
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
+size_t GreedyMapping<RADIAL_BASIS_FUNCTION_T>::estimateNumberOfCenters() {
+  return _maxIter; // static_cast<size_t>(_maxIter * 0.8);
+}
+
+template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   PRECICE_ASSERT(_greedyIDs.empty());
   PRECICE_ASSERT(_kernelEval.size() == 0);
 
-  if (this->hasConstraint(Mapping::CONSERVATIVE)) {
+  if (this->hasConstraint(Mapping::CONSERVATIVE)) { //TODO: kann das hier sein?
     _inputMesh  = this->output();
     _outputMesh = this->input();
   } else {
     _inputMesh  = this->input();
     _outputMesh = this->output();
   }
-  _inSize    = _inputMesh->vertices().size();
-  _outSize   = _outputMesh->vertices().size();
-  _basisSize = std::min(_inSize, _maxIter);
+  _inSize  = _inputMesh->vertices().size();
+  _outSize = _outputMesh->vertices().size();
+
+  _maxIter   = std::min(_inSize, _maxIter); // max iterations must be smaller than or equal to the number of verticies
+  _basisSize = estimateNumberOfCenters();
   _greedyIDs.reserve(_basisSize);
 }
 
@@ -245,7 +260,6 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConsistentWithCholesky(const time::Sample &inData, const Eigen::MatrixXd &choleskyA, Eigen::VectorXd &outData) const {
   const Eigen::VectorXd &linearisedVectors = inData.values;
 
-  const size_t    n = _greedyIDs.size();
   Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _inSize)(Eigen::all, _greedyIDs).transpose();
   Eigen::MatrixXd polynomialCoeffs;
 
@@ -254,8 +268,8 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConsistentWithCholesky(const t
     y -= _polyMatrixQ * polynomialCoeffs;
   }
 
-  Eigen::MatrixXd interpolationCoeffs = choleskyA.block(0, 0, n, n).triangularView<Eigen::Lower>().solve(y);
-  choleskyA.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>().solveInPlace(interpolationCoeffs);
+  Eigen::MatrixXd interpolationCoeffs = choleskyA.triangularView<Eigen::Lower>().solve(y);
+  choleskyA.transpose().triangularView<Eigen::Upper>().solveInPlace(interpolationCoeffs);
 
   for (int d = 0; d < inData.dataDims; d++) {
     outData(Eigen::seqN(d, _outSize, inData.dataDims)) = _kernelEval.transpose() * interpolationCoeffs.col(d);

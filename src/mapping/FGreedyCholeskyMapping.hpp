@@ -76,8 +76,7 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   precice::profiling::Event e("map.f-greedy-cholesky.computeMapping.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   super::computeMapping();
-  _basisMatrix = Eigen::MatrixXd::Zero(super::_inSize, super::_basisSize);
-  _choleskyA = Eigen::MatrixXd::Zero(super::_basisSize, super::_basisSize);
+  _basisMatrix.resize(super::_inSize, super::_basisSize); // TODO: test carefully
 
   this->_hasComputedMapping = true;
 }
@@ -89,8 +88,14 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
   Eigen::MatrixXd residual = inputData;
   super::_greedyIDs.clear();
 
+  std::string path = "/home/fabio/entwicklung/bachelorarbeit/turbine_test/greedy.csv";
+  std::fstream file;
+  file.open(path, std::fstream::in | std::fstream::out | std::fstream::app);
+
+  double fOut;
+  
   // Iterative selection of new points
-  for (size_t n = 0; n < super::_basisSize; ++n) {
+  for (size_t n = 0; n < super::_maxIter; ++n) {
 
     const auto [i, fMax] = super::select(residual);
     const auto x         = super::_inputMesh->vertices().at(i);
@@ -98,20 +103,30 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
     super::updateKernelVector(x, boost::irange(0UL, super::_inSize), basisVector);
     basisVector -= _basisMatrix.block(0, 0, super::_inSize, n) * _basisMatrix.block(i, 0, 1, n).transpose();
 
-    if (fMax < super::_tolerance || basisVector(i) <= 0)
-      break;
+    if (fMax < super::_tolerance || basisVector(i) <= 0 || n == super::_basisSize - 1) {
+      if (fMax < super::_tolerance || basisVector(i) <= 0) 
+        break;
+      super::_basisSize += static_cast<size_t>(0.2 * super::_basisSize);
+      _basisMatrix.conservativeResize(super::_inSize, super::_basisSize);
+      PRECICE_DEBUG("\nRESIZE\n");
+    }
     super::_greedyIDs.push_back(i);
 
     const double invP = 1.0 / std::sqrt(basisVector(i));
     basisVector *= invP;
     _basisMatrix.col(n) = basisVector;
-    _choleskyA.row(n) = _basisMatrix.row(i); // TODO: necessary?
 
     const Eigen::VectorXd newtonCoefficient = residual.col(i) * invP;
     residual -= newtonCoefficient * basisVector.transpose();
 
-    PRECICE_DEBUG("Iteration: {}, fMax = {}, P = {}\n", n + 1, fMax, basisVector(i));
+    fOut = fMax;
+    PRECICE_DEBUG("Iteration: {}, fMax = {}\n", n + 1, fMax);
   }
+  file << "f-greedy-c2-" << super::_maxIter << "," << super::_inSize << "," << super::_greedyIDs.size() << "," << std::sqrt(fOut) << "\n";
+  file.close();
+
+  _choleskyA   = _basisMatrix(super::_greedyIDs, Eigen::seqN(0, super::_greedyIDs.size()));
+  _basisMatrix = Eigen::MatrixXd();
 
   super::fillEvaluationMatrix();
   if (super::_usesPolynomial) {
@@ -150,7 +165,7 @@ std::string FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::getName() const {
 template <typename RADIAL_BASIS_FUNCTION_T>
 void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::clear() {
   super::clear();
-  _choleskyA = Eigen::MatrixXd();
+  _choleskyA   = Eigen::MatrixXd();
   _basisMatrix = Eigen::MatrixXd();
 }
 

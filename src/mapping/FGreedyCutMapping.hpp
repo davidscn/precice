@@ -85,6 +85,7 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::recalculateResidual(const Eigen
   }
   const Eigen::MatrixXd cy = _cut.block(n - 1, 0, 1, n) * inputData(Eigen::all, super::_greedyIDs).transpose(); // TODO: temporary allocation during calculation?
   interpolationCoeffs.block(0, 0, n, inputData.rows()) += _cut.block(n - 1, 0, 1, n).transpose() * cy;
+  // residual = (inputData - (_kernelMatrix(Eigen::all, super::_greedyIDs) * interpolationCoeffs.block(0, 0, n, inputData.rows())).transpose()).cwiseAbs(); //TODO: Segmentation Fault
   residual = (inputData - (_kernelMatrix.block(0, 0, super::_inSize, n) * interpolationCoeffs.block(0, 0, n, inputData.rows())).transpose()).cwiseAbs();
 }
 
@@ -97,6 +98,15 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   _cut          = Eigen::MatrixXd::Zero(super::_basisSize, super::_basisSize);
   _kernelMatrix = Eigen::MatrixXd::Zero(super::_inSize, super::_basisSize);
 
+  /* const mesh::Mesh::VertexContainer &inputVertices = super::_inputMesh->vertices();
+  for (size_t j = 0; j < super::_basisSize; j++) { 
+    for (size_t i = 0; i < super::_inSize; i++) {
+      const auto & u = inputVertices.at(i).rawCoords();
+      const auto & v = inputVertices.at(j).rawCoords();
+      const double d = computeSquaredDifference(u, v, super::_activeAxis);
+      _kernelMatrix(i, j) = _basisFunction.evaluate(std::sqrt(d));
+    }
+  } */
   this->_hasComputedMapping = true;
 }
 
@@ -112,7 +122,7 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
   const double kernelDiagonal = _basisFunction.evaluate(0);
 
   // Iterative selection of new points
-  for (size_t n = 0; n < super::_basisSize; ++n) {
+  for (size_t n = 0; n < super::_maxIter; ++n) {
 
     const auto [i, fMax] = super::select(residual);
     const auto x         = super::_inputMesh->vertices().at(i);
@@ -122,8 +132,19 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
     const double squareP = kernelDiagonal - basisVector.array().head(n).square().sum();
     const double invP    = 1.0 / std::sqrt(squareP);
 
-    if (fMax < super::_tolerance || squareP <= 0)
-      break;
+    if (fMax < super::_tolerance || n == super::_basisSize - 1) {
+      if (fMax < super::_tolerance) 
+        break;
+      super::_basisSize += static_cast<size_t>(0.2 * super::_basisSize);
+      _kernelMatrix.conservativeResize(super::_inSize, super::_basisSize);
+      _cut.conservativeResize(super::_basisSize, super::_basisSize);
+      _cut.block(0, n + 1, super::_basisSize, super::_basisSize - n - 1) = Eigen::MatrixXd::Zero(super::_basisSize, super::_basisSize - n - 1);
+      kernelVectorOldCenters.conservativeResize(super::_basisSize);
+      basisVector.conservativeResize(super::_basisSize);
+      interpolationCoeffs.conservativeResize(super::_basisSize, inputData.rows());
+      interpolationCoeffs.block(n + 1, 0, super::_basisSize - n - 1, inputData.rows()) = Eigen::MatrixXd::Zero(super::_basisSize - n - 1, inputData.rows());
+      PRECICE_DEBUG("Resizing matrices\n");
+    }
     super::_greedyIDs.push_back(i);
 
     _cut.block(n, 0, 1, n).noalias() = -basisVector.block(0, 0, n, 1).transpose() * _cut.block(0, 0, n, n).triangularView<Eigen::Lower>();
@@ -132,7 +153,7 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
 
     recalculateResidual(inputData, interpolationCoeffs, residual);
 
-    fmt::print("Iteration: {}, fMax = {}, P² = {}", n + 1, fMax, squareP);
+    fmt::print("Iteration: {}, fMax = {}, P² = {}\n", n + 1, fMax, squareP);
   }
   super::fillEvaluationMatrix();
   if (super::_usesPolynomial) {
