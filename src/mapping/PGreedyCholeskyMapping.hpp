@@ -26,6 +26,7 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 class PGreedyCholeskyMapping : public GreedyMapping<RADIAL_BASIS_FUNCTION_T> {
 
   using RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION_T>::_basisFunction;
+  using GreedyMapping<RADIAL_BASIS_FUNCTION_T>::_log;
   using super = GreedyMapping<RADIAL_BASIS_FUNCTION_T>;
   using GreedyParameter = MappingConfiguration::GreedyParameter;
 
@@ -50,8 +51,6 @@ public:
   std::string getName() const final override;
 
 private:
-  precice::logging::Logger _log{"mapping::RadialBasisFctMapping"};
-
   Eigen::VectorXd _powerFunction;
   Eigen::MatrixXd _choleskyA;
   Eigen::MatrixXd _basisMatrix;
@@ -77,17 +76,14 @@ void PGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   precice::profiling::Event e("map.P-greedy-cholesky.computeMapping.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   super::computeMapping();
-
-  std::string path = "/home/fabio/entwicklung/bachelorarbeit/turbine_test/greedy.csv";
-  std::fstream file;
-  file.open(path, std::fstream::in | std::fstream::out | std::fstream::app);
   
-  _basisMatrix.resize(super::_inSize, super::_basisSize); // TODO: test carefully
+  _basisMatrix.resize(super::_inSize, super::_basisSize);
   _powerFunction = Eigen::VectorXd(super::_inSize);
   _powerFunction.fill(_basisFunction.evaluate(0));
   Eigen::VectorXd basisVector(super::_inSize);
 
-  double pOut;
+  PRECICE_INFO("Preallocated {}% ({}) of centers.", static_cast<size_t>((super::_basisSize / super::_inSize) * 100), super::_basisSize);
+
   // Iterative selection of new points
   for (size_t n = 0; n < super::_maxIter; ++n) {
 
@@ -97,9 +93,8 @@ void PGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
     if (pMax < super::_tolerance || n == super::_basisSize) {
       if (pMax < super::_tolerance) 
         break;
-      super::_basisSize += static_cast<size_t>(0.2 * super::_basisSize);
+      super::calculateIncreasedNumberOfCenters();
       _basisMatrix.conservativeResize(super::_inSize, super::_basisSize);
-      PRECICE_DEBUG("\nRESIZE\n");
     }
     super::_greedyIDs.push_back(i);
 
@@ -111,13 +106,12 @@ void PGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
     _powerFunction -= (Eigen::VectorXd) basisVector.array().square();
     _basisMatrix.col(n) = basisVector;
 
-    pOut = pMax;
     PRECICE_DEBUG("Iteration: {}, pMax = {}", n + 1, pMax);
   }
-  file << "P-greedy-c2-" << super::_maxIter << "," << super::_inSize << "," << super::_greedyIDs.size() << "," << std::sqrt(pOut) << "\n";
-  file.close();
 
-  _choleskyA   = _basisMatrix(super::_greedyIDs, Eigen::seqN(0, super::_greedyIDs.size()));
+  PRECICE_INFO("Finished greedy search. Reordering cholesky matrix.");
+
+  _choleskyA   =  _basisMatrix(super::_greedyIDs, Eigen::seqN(0, super::_greedyIDs.size()));
   _basisMatrix = Eigen::MatrixXd();
 
   super::fillEvaluationMatrix();

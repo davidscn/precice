@@ -44,6 +44,8 @@ public:
 protected:
   using RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION_T>::_basisFunction;
 
+  precice::logging::Logger _log{"mapping::GreedyRBFMapping"};
+
   bool _usesPolynomial;
 
   mesh::PtrMesh _inputMesh;
@@ -80,6 +82,7 @@ protected:
   void solveConsistentWithCholesky(const time::Sample &inData, const Eigen::MatrixXd &choleskyA, Eigen::VectorXd &outData) const;
 
   size_t estimateNumberOfCenters();
+  void calculateIncreasedNumberOfCenters();
 };
 
 
@@ -93,7 +96,8 @@ GreedyMapping<RADIAL_BASIS_FUNCTION_T>::GreedyMapping(
     GreedyParameter         greedyParameter)
     : RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION_T>(constraint, dimensions, function, deadAxis, Mapping::InitialGuessRequirement::None)
 {
-  PRECICE_ASSERT(polynomial != Polynomial::ON, "Integrated polynomials not supported for greedy rbf methods");
+  PRECICE_CHECK(polynomial != Polynomial::ON, "Integrated polynomials not supported for greedy rbf methods");
+  PRECICE_CHECK(greedyParameter.maxIterations > 0, "Maximum number of iterations cannot be smaller than 1.")
   _usesPolynomial = (polynomial == Polynomial::SEPARATE);
 
   _tolerance = greedyParameter.tolerance;
@@ -151,7 +155,24 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vert
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 size_t GreedyMapping<RADIAL_BASIS_FUNCTION_T>::estimateNumberOfCenters() {
-  return _maxIter; // static_cast<size_t>(_maxIter * 0.8);
+  auto x0 = _inputMesh->vertices().at(0);
+  std::vector<int> matches = _inputMesh->index().getClosestVertices(x0.getCoords(), 4);
+  double h = 0;
+  for (int i = 0; i < 3; i++) {
+    auto xi = _inputMesh->vertices().at(matches.at(i));
+    double h = std::sqrt(computeSquaredDifference(xi.rawCoords(), x0.rawCoords(), _activeAxis));
+    h += std::sqrt(computeSquaredDifference(xi.rawCoords(), x0.rawCoords(), _activeAxis));
+    //PRECICE_DEBUG("h1 = {}", h);
+  }
+  h /= 3;
+
+  return static_cast<size_t>(0.1 * _maxIter);
+}
+
+template <typename RADIAL_BASIS_FUNCTION_T>
+void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::calculateIncreasedNumberOfCenters() {
+  _basisSize = _basisSize + std::min(_maxIter, static_cast<size_t>(0.1 * _maxIter));
+  PRECICE_INFO("Resizing matrices to {}% ({}) of centers.", static_cast<size_t>((_basisSize / _inSize) * 100), _basisSize);
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>

@@ -25,6 +25,7 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 class FGreedyCutMapping : public GreedyMapping<RADIAL_BASIS_FUNCTION_T> {
 
   using RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION_T>::_basisFunction;
+  using GreedyMapping<RADIAL_BASIS_FUNCTION_T>::_log;
   using GreedyParameter = MappingConfiguration::GreedyParameter;
   using super = GreedyMapping<RADIAL_BASIS_FUNCTION_T>;
 
@@ -49,8 +50,6 @@ public:
   std::string getName() const final override;
 
 private:
-  precice::logging::Logger _log{"mapping::RadialBasisFctMapping"};
-
   Eigen::MatrixXd _kernelMatrix;
   Eigen::MatrixXd _cut;
 
@@ -83,7 +82,7 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::recalculateResidual(const Eigen
     const double d          = computeSquaredDifference(u, v, super::_activeAxis);
     _kernelMatrix(i, n - 1) = _basisFunction.evaluate(std::sqrt(d));
   }
-  const Eigen::MatrixXd cy = _cut.block(n - 1, 0, 1, n) * inputData(Eigen::all, super::_greedyIDs).transpose(); // TODO: temporary allocation during calculation?
+  const Eigen::MatrixXd cy = _cut.block(n - 1, 0, 1, n) * inputData(Eigen::all, super::_greedyIDs).transpose();
   interpolationCoeffs.block(0, 0, n, inputData.rows()) += _cut.block(n - 1, 0, 1, n).transpose() * cy;
   // residual = (inputData - (_kernelMatrix(Eigen::all, super::_greedyIDs) * interpolationCoeffs.block(0, 0, n, inputData.rows())).transpose()).cwiseAbs(); //TODO: Segmentation Fault
   residual = (inputData - (_kernelMatrix.block(0, 0, super::_inSize, n) * interpolationCoeffs.block(0, 0, n, inputData.rows())).transpose()).cwiseAbs();
@@ -135,7 +134,7 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
     if (fMax < super::_tolerance || n == super::_basisSize - 1) {
       if (fMax < super::_tolerance) 
         break;
-      super::_basisSize += static_cast<size_t>(0.2 * super::_basisSize);
+      super::calculateIncreasedNumberOfCenters();
       _kernelMatrix.conservativeResize(super::_inSize, super::_basisSize);
       _cut.conservativeResize(super::_basisSize, super::_basisSize);
       _cut.block(0, n + 1, super::_basisSize, super::_basisSize - n - 1) = Eigen::MatrixXd::Zero(super::_basisSize, super::_basisSize - n - 1);
@@ -143,7 +142,6 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
       basisVector.conservativeResize(super::_basisSize);
       interpolationCoeffs.conservativeResize(super::_basisSize, inputData.rows());
       interpolationCoeffs.block(n + 1, 0, super::_basisSize - n - 1, inputData.rows()) = Eigen::MatrixXd::Zero(super::_basisSize - n - 1, inputData.rows());
-      PRECICE_DEBUG("Resizing matrices\n");
     }
     super::_greedyIDs.push_back(i);
 
@@ -153,8 +151,11 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
 
     recalculateResidual(inputData, interpolationCoeffs, residual);
 
-    fmt::print("Iteration: {}, fMax = {}, P² = {}\n", n + 1, fMax, squareP);
+    PRECICE_DEBUG("Iteration: {}, fMax = {}, P² = {}\n", n + 1, fMax, squareP);
   }
+
+  PRECICE_INFO("Finished greedy search and construction of inverse.");
+
   super::fillEvaluationMatrix();
   if (super::_usesPolynomial) {
     super::fillPolynomialMatrices();

@@ -25,6 +25,7 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 class FGreedyCholeskyMapping : public GreedyMapping<RADIAL_BASIS_FUNCTION_T> {
 
   using RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION_T>::_basisFunction;
+  using GreedyMapping<RADIAL_BASIS_FUNCTION_T>::_log;
   using GreedyParameter = MappingConfiguration::GreedyParameter;
   using super = GreedyMapping<RADIAL_BASIS_FUNCTION_T>;
 
@@ -49,8 +50,6 @@ public:
   std::string getName() const final override;
 
 private:
-  precice::logging::Logger _log{"mapping::RadialBasisFctMapping"};
-
   Eigen::MatrixXd _basisMatrix;
   Eigen::MatrixXd _choleskyA;
 
@@ -88,12 +87,6 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
   Eigen::MatrixXd residual = inputData;
   super::_greedyIDs.clear();
 
-  std::string path = "/home/fabio/entwicklung/bachelorarbeit/turbine_test/greedy.csv";
-  std::fstream file;
-  file.open(path, std::fstream::in | std::fstream::out | std::fstream::app);
-
-  double fOut;
-  
   // Iterative selection of new points
   for (size_t n = 0; n < super::_maxIter; ++n) {
 
@@ -106,9 +99,8 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
     if (fMax < super::_tolerance || basisVector(i) <= 0 || n == super::_basisSize - 1) {
       if (fMax < super::_tolerance || basisVector(i) <= 0) 
         break;
-      super::_basisSize += static_cast<size_t>(0.2 * super::_basisSize);
+      super::calculateIncreasedNumberOfCenters();
       _basisMatrix.conservativeResize(super::_inSize, super::_basisSize);
-      PRECICE_DEBUG("\nRESIZE\n");
     }
     super::_greedyIDs.push_back(i);
 
@@ -119,11 +111,10 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
     const Eigen::VectorXd newtonCoefficient = residual.col(i) * invP;
     residual -= newtonCoefficient * basisVector.transpose();
 
-    fOut = fMax;
     PRECICE_DEBUG("Iteration: {}, fMax = {}\n", n + 1, fMax);
   }
-  file << "f-greedy-c2-" << super::_maxIter << "," << super::_inSize << "," << super::_greedyIDs.size() << "," << std::sqrt(fOut) << "\n";
-  file.close();
+
+  PRECICE_INFO("Finished greedy search. Reordering cholesky matrix.");
 
   _choleskyA   = _basisMatrix(super::_greedyIDs, Eigen::seqN(0, super::_greedyIDs.size()));
   _basisMatrix = Eigen::MatrixXd();
