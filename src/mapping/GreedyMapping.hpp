@@ -97,7 +97,7 @@ GreedyMapping<RADIAL_BASIS_FUNCTION_T>::GreedyMapping(
     : RadialBasisFctBaseMapping<RADIAL_BASIS_FUNCTION_T>(constraint, dimensions, function, deadAxis, Mapping::InitialGuessRequirement::None)
 {
   PRECICE_CHECK(polynomial != Polynomial::ON, "Integrated polynomials not supported for greedy rbf methods");
-  PRECICE_CHECK(greedyParameter.maxIterations > 0, "Maximum number of iterations cannot be smaller than 1.")
+  PRECICE_CHECK(greedyParameter.maxIterations > 0, "Maximum number of iterations cannot be smaller than 1.");
   _usesPolynomial = (polynomial == Polynomial::SEPARATE);
 
   _tolerance = greedyParameter.tolerance;
@@ -113,8 +113,8 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::fillPolynomialMatrices() {
   precice::profiling::Event e("fillPolynomialMatrices", profiling::Synchronize);
 
   unsigned int polyParams = 4 - std::count(_activeAxis.begin(), _activeAxis.end(), false);
-  _polyMatrixQ.resize(_greedyIDs.size(), polyParams);
-  fillPolynomialEntries(_polyMatrixQ, *_inputMesh, _greedyIDs, 0, _activeAxis);
+  _polyMatrixQ.resize(_inSize, polyParams);
+  fillPolynomialEntries(_polyMatrixQ, *_inputMesh, boost::irange((size_t) 0, _inSize), 0, _activeAxis);
   _polyMatrixU.resize(_outSize, polyParams);
   fillPolynomialEntries(_polyMatrixU, *_outputMesh, boost::irange((size_t) 0, _outSize), 0, _activeAxis);
 
@@ -166,12 +166,12 @@ size_t GreedyMapping<RADIAL_BASIS_FUNCTION_T>::estimateNumberOfCenters() {
   }
   h /= 3;
 
-  return static_cast<size_t>(0.1 * _maxIter);
+  return static_cast<size_t>(0.1 * _maxIter + 1);
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::calculateIncreasedNumberOfCenters() {
-  _basisSize = _basisSize + std::min(_maxIter, static_cast<size_t>(0.1 * _maxIter));
+  _basisSize = _basisSize + std::min(_maxIter, static_cast<size_t>(0.1 * _maxIter + 1));
   PRECICE_INFO("Resizing matrices to {}% ({}) of centers.", static_cast<size_t>((_basisSize / _inSize) * 100), _basisSize);
 }
 
@@ -218,7 +218,10 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCut(const time
 
   Eigen::MatrixXd u = _kernelEval * y;
   Eigen::MatrixXd Cu = cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * u;
-  Eigen::MatrixXd prediction = cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cu;
+  Eigen::MatrixXd greedySolution = (cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cu)(_greedyIDs, Eigen::all);
+
+  Eigen::MatrixXd prediction = Eigen::MatrixXd::Zero(_inSize, inData.dataDims);
+  prediction(_greedyIDs, Eigen::all) = greedySolution;
 
   if (_usesPolynomial) {
     const Eigen::MatrixXd epsilon = _polyMatrixU.transpose() * y - _polyMatrixQ.transpose() * prediction;
@@ -226,7 +229,7 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCut(const time
     prediction += polynomialContribution;
   }
   for (int d = 0; d < inData.dataDims; d++) {
-    outData(Eigen::seqN(d, _inSize, inData.dataDims))(_greedyIDs) = prediction.col(d);
+    outData(Eigen::seqN(d, _inSize, inData.dataDims)) = prediction.col(d);
   }
 }
 
@@ -237,9 +240,12 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCholesky(const
   const size_t          n = _greedyIDs.size();
   const Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _outSize).transpose();
 
-  Eigen::MatrixXd prediction = _kernelEval * y;
-  choleskyA.block(0, 0, n, n).triangularView<Eigen::Lower>().solveInPlace(prediction);
-  choleskyA.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>().solveInPlace(prediction);
+  Eigen::MatrixXd greedySolution = _kernelEval * y;
+  choleskyA.block(0, 0, n, n).triangularView<Eigen::Lower>().solveInPlace(greedySolution);
+  choleskyA.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>().solveInPlace(greedySolution);
+
+  Eigen::MatrixXd prediction = Eigen::MatrixXd::Zero(_inSize, inData.dataDims);
+  prediction(_greedyIDs, Eigen::all) = greedySolution;
 
   if (_usesPolynomial) {
     const Eigen::MatrixXd epsilon = _polyMatrixU.transpose() * y - _polyMatrixQ.transpose() * prediction;
@@ -248,7 +254,7 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCholesky(const
   }
   outData = Eigen::VectorXd::Zero(_inSize * inData.dataDims);
   for (int d = 0; d < inData.dataDims; d++) {
-    outData(Eigen::seqN(d, _inSize, inData.dataDims))(_greedyIDs) = prediction.col(d);
+    outData(Eigen::seqN(d, _inSize, inData.dataDims)) = prediction.col(d);
   }
 }
 
@@ -257,15 +263,17 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConsistentWithCut(const time::
   const Eigen::VectorXd &linearisedVectors = inData.values;
   
   const size_t    n = _greedyIDs.size();
-  Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _inSize)(Eigen::all, _greedyIDs).transpose();
+  Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _inSize).transpose();
   Eigen::MatrixXd polynomialCoeffs;
 
   if (_usesPolynomial) {
     polynomialCoeffs = _qrDecomposedQ.solve(y);
     y -= _polyMatrixQ * polynomialCoeffs;
   }
-  const Eigen::MatrixXd Cy = cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * y;
-  const Eigen::MatrixXd interpolationCoeffs = cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cy;
+
+  const Eigen::MatrixXd z = y(_greedyIDs, Eigen::all);
+  const Eigen::MatrixXd Cz = cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * z;
+  const Eigen::MatrixXd interpolationCoeffs = cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cz;
 
   for (int d = 0; d < inData.dataDims; d++) {
     outData(Eigen::seqN(d, _outSize, inData.dataDims)) = _kernelEval.transpose() * interpolationCoeffs.col(d);
@@ -281,7 +289,7 @@ template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConsistentWithCholesky(const time::Sample &inData, const Eigen::MatrixXd &choleskyA, Eigen::VectorXd &outData) const {
   const Eigen::VectorXd &linearisedVectors = inData.values;
 
-  Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _inSize)(Eigen::all, _greedyIDs).transpose();
+  Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _inSize).transpose();
   Eigen::MatrixXd polynomialCoeffs;
 
   if (_usesPolynomial) {
@@ -289,7 +297,8 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConsistentWithCholesky(const t
     y -= _polyMatrixQ * polynomialCoeffs;
   }
 
-  Eigen::MatrixXd interpolationCoeffs = choleskyA.triangularView<Eigen::Lower>().solve(y);
+  Eigen::MatrixXd z = y(_greedyIDs, Eigen::all);
+  Eigen::MatrixXd interpolationCoeffs = choleskyA.triangularView<Eigen::Lower>().solve(z);
   choleskyA.transpose().triangularView<Eigen::Upper>().solveInPlace(interpolationCoeffs);
 
   for (int d = 0; d < inData.dataDims; d++) {

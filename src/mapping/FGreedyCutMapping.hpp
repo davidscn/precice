@@ -170,18 +170,20 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::Sampl
   precice::profiling::Event e("map.f-greedy-cut.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  const Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize);
+  Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize);
 
   Eigen::MatrixXd interpolationCoeffs = buildInterpolationMatrices(inputData);
 
   const size_t n = super::_greedyIDs.size();
-  Eigen::MatrixXd y = inputData(Eigen::all, super::_greedyIDs).transpose();
+  Eigen::MatrixXd y = inputData.transpose();
 
   if (super::_usesPolynomial) {
     Eigen::MatrixXd polynomialCoeffs = super::_qrDecomposedQ.solve(y);
-    y -= super::_polyMatrixQ * polynomialCoeffs;
-    Eigen::MatrixXd Cy = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * y;
+    inputData.transpose() -= super::_polyMatrixQ * polynomialCoeffs;
+    Eigen::MatrixXd z = inputData(Eigen::all, super::_greedyIDs).transpose();
+    Eigen::MatrixXd Cy = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * z;
     Eigen::MatrixXd interpolationCoeffs = _cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cy;
+    
     for (int d = 0; d < inData.dataDims; d++) {
       outData(Eigen::seqN(d, super::_outSize, inData.dataDims)) = super::_kernelEval.transpose() * interpolationCoeffs.col(d) + super::_polyMatrixU * polynomialCoeffs.col(d);
     }
