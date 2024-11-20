@@ -155,17 +155,15 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::updateKernelVector(const mesh::Vert
 
 template <typename RADIAL_BASIS_FUNCTION_T>
 size_t GreedyMapping<RADIAL_BASIS_FUNCTION_T>::estimateNumberOfCenters() {
-  auto x0 = _inputMesh->vertices().at(0);
-  std::vector<int> matches = _inputMesh->index().getClosestVertices(x0.getCoords(), 4);
-  double h = 0;
-  for (int i = 0; i < 3; i++) {
-    auto xi = _inputMesh->vertices().at(matches.at(i));
-    double h = std::sqrt(computeSquaredDifference(xi.rawCoords(), x0.rawCoords(), _activeAxis));
-    h += std::sqrt(computeSquaredDifference(xi.rawCoords(), x0.rawCoords(), _activeAxis));
-    //PRECICE_DEBUG("h1 = {}", h);
-  }
-  h /= 3;
-
+  // auto x0 = _inputMesh->vertices().at(0);
+  // std::vector<int> matches = _inputMesh->index().getClosestVertices(x0.getCoords(), 4);
+  // double h = 0;
+  // for (int i = 0; i < 3; i++) {
+  //   auto xi = _inputMesh->vertices().at(matches.at(i));
+  //   double h = std::sqrt(computeSquaredDifference(xi.rawCoords(), x0.rawCoords(), _activeAxis));
+  //   h += std::sqrt(computeSquaredDifference(xi.rawCoords(), x0.rawCoords(), _activeAxis));
+  // }
+  // h /= 3;
   return static_cast<size_t>(0.1 * _maxIter + 1);
 }
 
