@@ -75,7 +75,7 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping() {
   precice::profiling::Event e("map.f-greedy-cholesky.computeMapping.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   super::computeMapping();
-  _basisMatrix.resize(super::_inSize, super::_basisSize); // TODO: test carefully
+  _basisMatrix.resize(super::_inSize, super::_basisSize);
 
   this->_hasComputedMapping = true;
 }
@@ -108,8 +108,8 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
     basisVector *= invP;
     _basisMatrix.col(n) = basisVector;
 
-    const Eigen::VectorXd newtonCoefficient = residual.col(i) * invP;
-    residual -= newtonCoefficient * basisVector.transpose();
+    const Eigen::VectorXd newtonCoefficient = residual.row(i).transpose() * invP;
+    residual -= basisVector * newtonCoefficient.transpose();
 
     PRECICE_DEBUG("Iteration: {}, fMax = {}\n", n + 1, fMax);
   }
@@ -132,7 +132,7 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::
   precice::profiling::Event e("map.f-greedy-cholesky.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  const Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize);
+  const Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize).transpose();
   buildInterpolationMatrices(inputData);
   super::solveConsistentWithCholesky(inData, _choleskyA, outData);
 }
@@ -143,7 +143,7 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::mapConservative(const time
   precice::profiling::Event e("map.f-greedy-cholesky.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize);
+  Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize).transpose();
   buildInterpolationMatrices(inputData);
   super::solveConservativeWithCholesky(inData, _choleskyA, outData);
 }

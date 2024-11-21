@@ -203,7 +203,7 @@ std::pair<int, double> GreedyMapping<RADIAL_BASIS_FUNCTION_T>::select(const Eige
 template <typename RADIAL_BASIS_FUNCTION_T>
 std::pair<int, double> GreedyMapping<RADIAL_BASIS_FUNCTION_T>::select(const Eigen::MatrixXd &residual) const {
   Eigen::Index maxIndex;
-  double       maxValue = residual.colwise().squaredNorm().maxCoeff(&maxIndex);
+  double       maxValue = residual.rowwise().squaredNorm().maxCoeff(&maxIndex);
   return {maxIndex, maxValue};
 }
 
@@ -250,7 +250,6 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCholesky(const
     const Eigen::MatrixXd polynomialContribution = _qrDecomposedQ.transpose().solve(epsilon);
     prediction += polynomialContribution;
   }
-  outData = Eigen::VectorXd::Zero(_inSize * inData.dataDims);
   for (int d = 0; d < inData.dataDims; d++) {
     outData(Eigen::seqN(d, _inSize, inData.dataDims)) = prediction.col(d);
   }

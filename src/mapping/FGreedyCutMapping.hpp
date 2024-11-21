@@ -82,10 +82,10 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::recalculateResidual(const Eigen
     const double d          = computeSquaredDifference(u, v, super::_activeAxis);
     _kernelMatrix(i, n - 1) = _basisFunction.evaluate(std::sqrt(d));
   }
-  const Eigen::MatrixXd cy = _cut.block(n - 1, 0, 1, n) * inputData(Eigen::all, super::_greedyIDs).transpose();
-  interpolationCoeffs.block(0, 0, n, inputData.rows()) += _cut.block(n - 1, 0, 1, n).transpose() * cy;
+  const Eigen::MatrixXd cy = _cut.block(n - 1, 0, 1, n) * inputData.transpose()(Eigen::all, super::_greedyIDs).transpose();
+  interpolationCoeffs.block(0, 0, n, inputData.cols()) += _cut.block(n - 1, 0, 1, n).transpose() * cy;
   // residual = (inputData - (_kernelMatrix(Eigen::all, super::_greedyIDs) * interpolationCoeffs.block(0, 0, n, inputData.rows())).transpose()).cwiseAbs(); //TODO: Segmentation Fault
-  residual = (inputData - (_kernelMatrix.block(0, 0, super::_inSize, n) * interpolationCoeffs.block(0, 0, n, inputData.rows())).transpose()).cwiseAbs();
+  residual = (inputData - (_kernelMatrix.block(0, 0, super::_inSize, n) * interpolationCoeffs.block(0, 0, n, inputData.cols()))).cwiseAbs();
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
@@ -115,7 +115,7 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
   Eigen::MatrixXd residual               = inputData;
   Eigen::VectorXd kernelVectorOldCenters = Eigen::VectorXd::Ones(super::_basisSize);
   Eigen::VectorXd basisVector            = Eigen::VectorXd::Ones(super::_basisSize);
-  Eigen::MatrixXd interpolationCoeffs    = Eigen::MatrixXd::Zero(super::_basisSize, inputData.rows());
+  Eigen::MatrixXd interpolationCoeffs    = Eigen::MatrixXd::Zero(super::_basisSize, inputData.cols());
   super::_greedyIDs.clear();
 
   const double kernelDiagonal = _basisFunction.evaluate(0);
@@ -140,8 +140,8 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
       _cut.block(0, n + 1, super::_basisSize, super::_basisSize - n - 1) = Eigen::MatrixXd::Zero(super::_basisSize, super::_basisSize - n - 1);
       kernelVectorOldCenters.conservativeResize(super::_basisSize);
       basisVector.conservativeResize(super::_basisSize);
-      interpolationCoeffs.conservativeResize(super::_basisSize, inputData.rows());
-      interpolationCoeffs.block(n + 1, 0, super::_basisSize - n - 1, inputData.rows()) = Eigen::MatrixXd::Zero(super::_basisSize - n - 1, inputData.rows());
+      interpolationCoeffs.conservativeResize(super::_basisSize, inputData.cols());
+      interpolationCoeffs.block(n + 1, 0, super::_basisSize - n - 1, inputData.cols()) = Eigen::MatrixXd::Zero(super::_basisSize - n - 1, inputData.cols());
     }
     super::_greedyIDs.push_back(i);
 
@@ -170,18 +170,17 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::Sampl
   precice::profiling::Event e("map.f-greedy-cut.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize);
+  Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize).transpose();
 
-  Eigen::MatrixXd interpolationCoeffs = buildInterpolationMatrices(inputData);
+  Eigen::MatrixXd interpolationCoeffs = buildInterpolationMatrices(y);
 
   const size_t n = super::_greedyIDs.size();
-  Eigen::MatrixXd y = inputData.transpose();
 
   if (super::_usesPolynomial) {
     Eigen::MatrixXd polynomialCoeffs = super::_qrDecomposedQ.solve(y);
-    inputData.transpose() -= super::_polyMatrixQ * polynomialCoeffs;
-    Eigen::MatrixXd z = inputData(Eigen::all, super::_greedyIDs).transpose();
-    Eigen::MatrixXd Cy = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * z;
+    y -= super::_polyMatrixQ * polynomialCoeffs;
+
+    Eigen::MatrixXd Cy = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * y(super::_greedyIDs, Eigen::all);
     Eigen::MatrixXd interpolationCoeffs = _cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cy;
     
     for (int d = 0; d < inData.dataDims; d++) {
@@ -200,7 +199,7 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConservative(const time::Sam
   precice::profiling::Event e("map.f-greedy-cut.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize);
+  Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize).transpose();
   buildInterpolationMatrices(inputData);
   super::solveConservativeWithCut(inData, _cut, outData);
 }
