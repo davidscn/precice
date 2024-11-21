@@ -258,7 +258,7 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConservativeWithCholesky(const
 template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConsistentWithCut(const time::Sample &inData, const Eigen::MatrixXd &cut, Eigen::VectorXd &outData) const {
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  
+
   const size_t    n = _greedyIDs.size();
   Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, _inSize).transpose();
   Eigen::MatrixXd polynomialCoeffs;
@@ -294,8 +294,8 @@ void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::solveConsistentWithCholesky(const t
     y -= _polyMatrixQ * polynomialCoeffs;
   }
 
-  Eigen::MatrixXd z = y(_greedyIDs, Eigen::all);
-  Eigen::MatrixXd interpolationCoeffs = choleskyA.triangularView<Eigen::Lower>().solve(z);
+  Eigen::MatrixXd interpolationCoeffs = y(_greedyIDs, Eigen::all);
+  choleskyA.triangularView<Eigen::Lower>().solveInPlace(interpolationCoeffs);
   choleskyA.transpose().triangularView<Eigen::Upper>().solveInPlace(interpolationCoeffs);
 
   for (int d = 0; d < inData.dataDims; d++) {

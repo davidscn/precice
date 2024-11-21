@@ -157,9 +157,6 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
   PRECICE_INFO("Finished greedy search and construction of inverse.");
 
   super::fillEvaluationMatrix();
-  if (super::_usesPolynomial) {
-    super::fillPolynomialMatrices();
-  }
   return interpolationCoeffs;
 }
 
@@ -170,23 +167,26 @@ void FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::Sampl
   precice::profiling::Event e("map.f-greedy-cut.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   const Eigen::VectorXd &linearisedVectors = inData.values;
+
   Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize).transpose();
 
-  Eigen::MatrixXd interpolationCoeffs = buildInterpolationMatrices(y);
-
-  const size_t n = super::_greedyIDs.size();
-
   if (super::_usesPolynomial) {
-    Eigen::MatrixXd polynomialCoeffs = super::_qrDecomposedQ.solve(y);
+    super::fillPolynomialMatrices();
+    const Eigen::MatrixXd polynomialCoeffs = super::_qrDecomposedQ.solve(y);
     y -= super::_polyMatrixQ * polynomialCoeffs;
 
-    Eigen::MatrixXd Cy = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * y(super::_greedyIDs, Eigen::all);
-    Eigen::MatrixXd interpolationCoeffs = _cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cy;
+    buildInterpolationMatrices(y);
+    const size_t n = super::_greedyIDs.size();
+
+    const Eigen::MatrixXd Cy = _cut.block(0, 0, n, n).triangularView<Eigen::Lower>() * y(super::_greedyIDs, Eigen::all);
+    const Eigen::MatrixXd interpolationCoeffs = _cut.block(0, 0, n, n).transpose().triangularView<Eigen::Upper>() * Cy;
     
     for (int d = 0; d < inData.dataDims; d++) {
       outData(Eigen::seqN(d, super::_outSize, inData.dataDims)) = super::_kernelEval.transpose() * interpolationCoeffs.col(d) + super::_polyMatrixU * polynomialCoeffs.col(d);
     }
   } else {
+    const Eigen::MatrixXd interpolationCoeffs = buildInterpolationMatrices(y);
+    const size_t n = super::_greedyIDs.size();
     for (int d = 0; d < inData.dataDims; d++) {
       outData(Eigen::seqN(d, super::_outSize, inData.dataDims)) = super::_kernelEval.transpose() * interpolationCoeffs.col(d).head(n);
     }

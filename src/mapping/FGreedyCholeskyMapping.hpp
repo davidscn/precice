@@ -120,9 +120,6 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
   _basisMatrix = Eigen::MatrixXd();
 
   super::fillEvaluationMatrix();
-  if (super::_usesPolynomial) {
-    super::fillPolynomialMatrices();
-  }
 }
 
 
@@ -132,9 +129,29 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time::
   precice::profiling::Event e("map.f-greedy-cholesky.mapData.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   const Eigen::VectorXd &linearisedVectors = inData.values;
-  const Eigen::MatrixXd inputData = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize).transpose();
-  buildInterpolationMatrices(inputData);
-  super::solveConsistentWithCholesky(inData, _choleskyA, outData);
+  Eigen::MatrixXd y = Eigen::Map<const Eigen::MatrixXd>(linearisedVectors.data(), inData.dataDims, super::_inSize).transpose();
+
+  Eigen::MatrixXd polynomialCoeffs;
+  if (super::_usesPolynomial) {
+    super::fillPolynomialMatrices();
+    polynomialCoeffs = super::_qrDecomposedQ.solve(y);
+    y -= super::_polyMatrixQ * polynomialCoeffs;
+  }
+
+  buildInterpolationMatrices(y);
+
+  Eigen::MatrixXd interpolationCoeffs = y(super::_greedyIDs, Eigen::all);
+  _choleskyA.triangularView<Eigen::Lower>().solveInPlace(interpolationCoeffs);
+  _choleskyA.transpose().triangularView<Eigen::Upper>().solveInPlace(interpolationCoeffs);
+
+  for (int d = 0; d < inData.dataDims; d++) {
+    outData(Eigen::seqN(d, super::_outSize, inData.dataDims)) = super::_kernelEval.transpose() * interpolationCoeffs.col(d);
+  }
+  if (super::_usesPolynomial) {
+    for (int d = 0; d < inData.dataDims; d++) {
+      outData(Eigen::seqN(d, super::_outSize, inData.dataDims)) += super::_polyMatrixU * polynomialCoeffs.col(d);
+    }
+  }
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
