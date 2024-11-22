@@ -116,8 +116,7 @@ void FGreedyCholeskyMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMatrices
 
   PRECICE_INFO("Finished greedy search. Reordering cholesky matrix.");
 
-  _choleskyA   = _basisMatrix(super::_greedyIDs, Eigen::seqN(0, super::_greedyIDs.size()));
-  _basisMatrix = Eigen::MatrixXd();
+  _choleskyA = _basisMatrix(super::_greedyIDs, Eigen::seqN(0, super::_greedyIDs.size()));
 
   super::fillEvaluationMatrix();
 }

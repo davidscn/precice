@@ -170,7 +170,7 @@ size_t GreedyMapping<RADIAL_BASIS_FUNCTION_T>::estimateNumberOfCenters() {
 template <typename RADIAL_BASIS_FUNCTION_T>
 void GreedyMapping<RADIAL_BASIS_FUNCTION_T>::calculateIncreasedNumberOfCenters() {
   _basisSize = _basisSize + std::min(_maxIter, static_cast<size_t>(0.1 * _maxIter + 1));
-  PRECICE_INFO("Resizing matrices to {}% ({}) of centers.", static_cast<size_t>((_basisSize / _inSize) * 100), _basisSize);
+  PRECICE_INFO("Resizing matrices to {}% ({}) of centers.", static_cast<size_t>((float(_basisSize) / float(_inSize)) * 100), _basisSize);
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>

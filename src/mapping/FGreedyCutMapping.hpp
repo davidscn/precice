@@ -151,7 +151,7 @@ Eigen::MatrixXd FGreedyCutMapping<RADIAL_BASIS_FUNCTION_T>::buildInterpolationMa
 
     recalculateResidual(inputData, interpolationCoeffs, residual);
 
-    PRECICE_DEBUG("Iteration: {}, fMax = {}, P² = {}\n", n + 1, fMax, squareP);
+    PRECICE_DEBUG("Iteration: {}, fMax = {}\n", n + 1, fMax, squareP);
   }
 
   PRECICE_INFO("Finished greedy search and construction of inverse.");

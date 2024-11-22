@@ -196,6 +196,7 @@ target_sources(testprecice
     tests/serial/mapping-greedy-kernel/GreedyConservativePoly.cpp
     tests/serial/mapping-greedy-kernel/GreedyConsistent.cpp
     tests/serial/mapping-greedy-kernel/GreedyConsistentPoly.cpp
+    tests/serial/mapping-greedy-kernel/GreedyTimeDependent.cpp
     tests/serial/mapping-greedy-kernel/helpers.cpp
     tests/serial/mapping-greedy-kernel/helpers.hpp
     tests/serial/mapping-nearest-neighbor-gradient/GradientTestBidirectionalReadScalar.cpp
