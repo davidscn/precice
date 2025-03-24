@@ -301,7 +301,6 @@ void ParticipantImpl::reinitialize()
   PRECICE_TRACE();
   PRECICE_ASSERT(_allowsRemeshing);
 
-  PRECICE_DEBUG("Handling direct-access data before reinitialization");
   PRECICE_ASSERT(_couplingScheme->isTimeWindowComplete());
   // In case we have data written via direct access, we need to first exchange these data samples
   // Step 1: store data for those data contexts
