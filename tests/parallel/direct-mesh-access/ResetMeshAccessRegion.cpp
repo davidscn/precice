@@ -168,15 +168,6 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
         return value * value - value * time;
       });
 
-      if (context.rank == 0) {
-        for (int i = 0; i < expectedMesh.size() / dim; ++i)
-          std::cout << "Writing: Rank 0: " << writeData[dim * i] << "  positions: " << expectedMesh[dim * i] << "  at time: " << time << std::endl;
-      }
-      if (context.rank == 1) {
-        for (int i = 0; i < expectedMesh.size() / dim; ++i)
-          std::cout << "Writing: Rank 1: " << writeData[dim * i] << "  positions: " << expectedMesh[dim * i] << "  at time: " << time << std::endl;
-      }
-
       // write
       interface.writeData(receivedMeshName, writeDataName, receiveMeshIDs, writeData);
       interface.advance(dt);
