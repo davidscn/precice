@@ -140,8 +140,6 @@ void ParallelCouplingScheme::exchangeSecondData()
     moveToNextWindow();
   } else {
     PRECICE_ASSERT(isImplicitCouplingScheme());
-    PRECICE_ASSERT(false, "Not (yet) considered");
-
     if (doesFirstStep()) { // first participant
       PRECICE_DEBUG("Receiving convergence data...");
       receiveConvergence(getM2N());

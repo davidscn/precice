@@ -301,21 +301,20 @@ void ParticipantImpl::reinitialize()
   PRECICE_TRACE();
   PRECICE_ASSERT(_allowsRemeshing);
 
-  PRECICE_DEBUG("Handling direct-access data before reinitialization");
   PRECICE_ASSERT(_couplingScheme->isTimeWindowComplete());
   // In case we have data written via direct access, we need to first exchange these data samples
   // Step 1: store data for those data contexts
-  for (auto &context : _accessor->writeDataContexts()) {
-    if (_accessor->isDirectAccessAllowed(context.getMeshName())) {
-      context.completeJustInTimeMapping();
-      context.storeBufferedData(_couplingScheme->getTime());
-      context.resetBufferedData();
-    }
-  }
+  // for (auto &context : _accessor->writeDataContexts()) {
+  //   if (_accessor->isDirectAccessAllowed(context.getMeshName())) {
+  //     context.completeJustInTimeMapping();
+  //     context.storeBufferedData(_couplingScheme->getTime());
+  //     context.resetBufferedData();
+  //   }
+  // }
 
   // Step 2: exchange the data
-  PRECICE_DEBUG("Exchanging direct access data");
-  _couplingScheme->exchangeDirectAccessData();
+  // PRECICE_DEBUG("Exchanging direct access data");
+  // _couplingScheme->exchangeDirectAccessData();
 
   PRECICE_INFO("Reinitializing Participant");
   Event e("reinitialize", profiling::Fundamental);
@@ -426,17 +425,20 @@ void ParticipantImpl::advance(
   PRECICE_CHECK(computedTimeStepSize > 0.0, "advance() cannot be called with a negative time step size {}.", computedTimeStepSize);
   _numberAdvanceCalls++;
 
-#ifndef NDEBUG
-  PRECICE_DEBUG("Synchronize time step size");
-  if (utils::IntraComm::isParallel()) {
-    syncTimestep(computedTimeStepSize);
-  }
-#endif
+  // #ifndef NDEBUG
+  //   PRECICE_DEBUG("Synchronize time step size");
+  //   if (utils::IntraComm::isParallel()) {
+  //     syncTimestep(computedTimeStepSize);
+  //   }
+  // #endif
 
   // Update the coupling scheme time state. Necessary to get correct remainder.
-  const bool isAtWindowEnd   = _couplingScheme->addComputedTime(computedTimeStepSize);
-  bool       performedReinit = false;
-  if (_allowsRemeshing) {
+  const bool isAtWindowEnd          = _couplingScheme->addComputedTime(computedTimeStepSize);
+  bool       requiresSeparateReinit = std::any_of(_accessor->writeDataContexts().begin(), _accessor->writeDataContexts().end(), [&](const auto &v) {
+    return _accessor->isDirectAccessAllowed(v.getMeshName());
+  });
+
+  if (_allowsRemeshing && !requiresSeparateReinit) {
     if (isAtWindowEnd) {
       auto totalMeshChanges = getTotalMeshChanges();
       clearStamplesOfChangedMeshes(totalMeshChanges);
@@ -444,7 +446,6 @@ void ParticipantImpl::advance(
       int sumOfChanges = std::accumulate(totalMeshChanges.begin(), totalMeshChanges.end(), 0);
       if (reinitHandshake(sumOfChanges)) {
         reinitialize();
-        performedReinit = true;
       }
     } else {
       PRECICE_CHECK(_meshLock.checkAll(), "The time window needs to end after remeshing.");
@@ -454,7 +455,7 @@ void ParticipantImpl::advance(
   const double timeSteppedTo = _couplingScheme->getTime();
   const auto   dataToReceive = _couplingScheme->implicitDataToReceive();
 
-  handleDataBeforeAdvance(isAtWindowEnd, timeSteppedTo, performedReinit);
+  handleDataBeforeAdvance(isAtWindowEnd, timeSteppedTo, false);
 
   advanceCouplingScheme();
 
@@ -816,6 +817,41 @@ void ParticipantImpl::resetMeshAccessRegion(std::string_view meshName)
   context.userDefinedAccessRegion.reset();
   context.mesh->resetBoundingBox();
   _meshLock.unlock(meshName);
+}
+
+bool ParticipantImpl::reinitializeAPIAccess()
+{
+  PRECICE_EXPERIMENTAL_API();
+  PRECICE_CHECK(_allowsRemeshing, "Cannot reset access region. This feature needs to be enabled in the precice configuration file using <precice-configuration experimental=\"1\" allow-remeshing=\"1\">.");
+  PRECICE_CHECK(_state == State::Initialized, "initialize() has to be called before reinitializeAPIAccess().");
+  PRECICE_CHECK(_couplingScheme->isCouplingOngoing(), "Cannot remesh after the last time window has been completed.");
+  // PRECICE_CHECK(_couplingScheme->isTimeWindowComplete(), "Cannot remesh while subcycling or iterating. Remeshing is only allowed when the time window is completed.");
+
+  auto requiresSeparateReinit = std::any_of(_accessor->writeDataContexts().begin(), _accessor->writeDataContexts().end(), [&](const auto &v) {
+    auto m = v.getMeshName();
+    return _accessor->isMeshReceived(m) && _accessor->isDirectAccessAllowed(m);
+  });
+  PRECICE_CHECK(requiresSeparateReinit, "You tried to use the manual reinitializeAPIAccess, but using reinitializeAPIAccess is only permitted for participants using direct-mesh access or just-in-time mappings in write direction");
+
+  PRECICE_DEBUG("Manually reinitializing via API");
+  // TODO: Maybe we need the dt as an argument
+  const bool isAtWindowEnd             = true; //_couplingScheme->addComputedTime(computedTimeStepSize);
+  bool       performedReinitialization = false;
+  if (_allowsRemeshing) {
+    if (isAtWindowEnd) {
+      auto totalMeshChanges = getTotalMeshChanges();
+      clearStamplesOfChangedMeshes(totalMeshChanges);
+
+      int sumOfChanges = std::accumulate(totalMeshChanges.begin(), totalMeshChanges.end(), 0);
+      if (reinitHandshake(sumOfChanges)) {
+        reinitialize();
+        performedReinitialization = true;
+      }
+    } else {
+      PRECICE_CHECK(_meshLock.checkAll(), "The time window needs to end after remeshing.");
+    }
+  }
+  return performedReinitialization;
 }
 
 VertexID ParticipantImpl::setMeshVertex(

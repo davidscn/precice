@@ -49,6 +49,7 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
 
       // read
       interface.readData(providedMeshName, readDataName, ids, dt, readData);
+
       BOOST_TEST(expectedData == readData, boost::test_tools::per_element());
 
       // expected Data (lags one dt behind due to coupling scheme)
@@ -57,11 +58,13 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
       });
 
       // We manually account for values excluded due to the access region
-      if (time < 3) {
+      if (time == 1 /* || time == 2*/) {
         expectedData[2 * dim] = expectedData[2 * dim + 1] = 0;
-      } else if (time < 4) {
+      }
+      if (time == 2) {
         expectedData[0 * dim] = expectedData[0 * dim + 1] = 0;
-      } else {
+      }
+      if (time == 3) {
         expectedData[0 * dim] = expectedData[0 * dim + 1] = 0;
         expectedData[1 * dim] = expectedData[1 * dim + 1] = 0;
       }
@@ -125,14 +128,6 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
       interface.readData(receivedMeshName, readDataName, receiveMeshIDs, dt, readData);
       BOOST_TEST(expectedData == readData, boost::test_tools::per_element());
 
-      // (artificial) solve: fill writeData
-      std::transform(expectedMesh.begin(), expectedMesh.end(), writeData.begin(), [&](double value) {
-        return value * value - value * time;
-      });
-
-      // write
-      interface.writeData(receivedMeshName, writeDataName, receiveMeshIDs, writeData);
-
       // we can't call this function in the first time step, see #2093
       if (time > 1 && time < 4) {
         interface.resetMeshAccessRegion(receivedMeshName);
@@ -145,19 +140,25 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
         expectedMesh = std::vector<double>(startIter, endIter);
         interface.setMeshAccessRegion(receivedMeshName, boundingBox);
       }
+
+      if (interface.reinitializeAPIAccess()) {
+        // First, check the sizes
+        receivedMeshSize = interface.getMeshVertexSize(receivedMeshName);
+        BOOST_TEST(receivedMeshSize == (expectedMesh.size() / dim));
+
+        // Resize vectors
+        receiveMeshIDs.resize(receivedMeshSize, -1);
+        receivedMesh = writeData = readData = expectedData = std::vector<double>(receivedMeshSize * dim, -1);
+        interface.getMeshVertexIDsAndCoordinates(receivedMeshName, receiveMeshIDs, receivedMesh);
+        BOOST_TEST(receivedMesh == expectedMesh, boost::test_tools::per_element());
+      }
+      // (artificial) solve: fill writeData  and write
+      std::transform(expectedMesh.begin(), expectedMesh.end(), writeData.begin(), [&](double value) {
+        return value * value - value * time;
+      });
+
+      interface.writeData(receivedMeshName, writeDataName, receiveMeshIDs, writeData);
       interface.advance(dt);
-
-      // After advance, we have the new vertices and IDs of the new access region
-      // First, check the sizes
-      receivedMeshSize = interface.getMeshVertexSize(receivedMeshName);
-      BOOST_TEST(receivedMeshSize == (expectedMesh.size() / dim));
-
-      // Resize vectors
-      receiveMeshIDs.resize(receivedMeshSize, -1);
-      receivedMesh = writeData = readData = expectedData = std::vector<double>(receivedMeshSize * dim, -1);
-      interface.getMeshVertexIDsAndCoordinates(receivedMeshName, receiveMeshIDs, receivedMesh);
-
-      BOOST_TEST(receivedMesh == expectedMesh, boost::test_tools::per_element());
 
       // the expected data lags one behind, so we generate (the same) reference solution as writeData for SolverOne, one dt later
       std::transform(expectedMesh.begin(), expectedMesh.end(), expectedData.begin(), [&](double value) {

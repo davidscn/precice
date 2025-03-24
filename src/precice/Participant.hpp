@@ -1110,6 +1110,10 @@ public:
   void resetMeshAccessRegion(::precice::string_view meshName);
   ///@}
 
+  /// asks preCICE to figure out if any mesh changes became relevant to this participant
+  /// returns true, if the mesh in the access region changed and false, if the mesh in the access region did not change
+  bool reinitializeAPIAccess();
+
   /** @name Experimental: Gradient Data
    * These API functions are \b experimental and may change in future versions.
    */
