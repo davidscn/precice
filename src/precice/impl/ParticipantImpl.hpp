@@ -146,6 +146,8 @@ public:
   /// @copydoc Participant::resetMeshAccessRegion
   void resetMeshAccessRegion(std::string_view meshName);
 
+  bool reinitializeAPIAccess();
+
   /// @copydoc Participant::requiresMeshConnectivityFor
   bool requiresMeshConnectivityFor(std::string_view meshName) const;
 

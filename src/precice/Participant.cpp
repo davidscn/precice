@@ -114,6 +114,11 @@ void Participant::resetMeshAccessRegion(::precice::string_view meshName)
   return _impl->resetMeshAccessRegion(toSV(meshName));
 }
 
+bool Participant::reinitializeAPIAccess()
+{
+  return _impl->reinitializeAPIAccess();
+}
+
 bool Participant::requiresGradientDataFor(::precice::string_view meshName,
                                           ::precice::string_view dataName) const
 {

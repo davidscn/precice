@@ -121,29 +121,30 @@ BOOST_AUTO_TEST_CASE(RemeshReceivedMesh)
       interface.readData(receivedMeshName, readDataName, receiveMeshIDs, dt, readData);
       BOOST_TEST(expectedData == readData, boost::test_tools::per_element());
 
-      // our artificial solve
+      // mesh changes apply
+      if (interface.reinitializeAPIAccess()) {
+        if (time > 1) {
+          expectedMesh.push_back(0.2 + time * 0.1);
+          expectedMesh.push_back(1.25);
+          std::transform(expectedMesh.begin(), expectedMesh.end(), expectedMesh.begin(), [&](double value) {
+            return value + 0.1;
+          });
+        }
+        receivedMeshSize = interface.getMeshVertexSize(receivedMeshName);
+        BOOST_TEST(receivedMeshSize == expectedMesh.size() / dim);
+        receiveMeshIDs.resize(receivedMeshSize);
+        writeData = readData = expectedData = receivedMesh = std::vector<double>(receivedMeshSize * dim, -1);
+        interface.getMeshVertexIDsAndCoordinates(receivedMeshName, receiveMeshIDs, receivedMesh);
+        BOOST_TEST(receivedMesh == expectedMesh, boost::test_tools::per_element());
+      }
+
+      // now we evaluate on the coordinates we received
       std::transform(expectedMesh.begin(), expectedMesh.end(), writeData.begin(), [&](double value) {
         return value * (value + 7.3) - (value + 5) * time;
       });
 
       interface.writeData(receivedMeshName, writeDataName, receiveMeshIDs, writeData);
       interface.advance(dt);
-
-      // mesh changes apply
-      if (time > 1) {
-        expectedMesh.push_back(0.2 + time * 0.1);
-        expectedMesh.push_back(1.25);
-        std::transform(expectedMesh.begin(), expectedMesh.end(), expectedMesh.begin(), [&](double value) {
-          return value + 0.1;
-        });
-      }
-
-      receivedMeshSize = interface.getMeshVertexSize(receivedMeshName);
-      BOOST_TEST(receivedMeshSize == expectedMesh.size() / dim);
-      receiveMeshIDs.resize(receivedMeshSize);
-      writeData = readData = expectedData = receivedMesh = std::vector<double>(receivedMeshSize * dim, -1);
-      interface.getMeshVertexIDsAndCoordinates(receivedMeshName, receiveMeshIDs, receivedMesh);
-      BOOST_TEST(receivedMesh == expectedMesh, boost::test_tools::per_element());
 
       // and the new reference data, according to the 'write' formula on the other participant (before we increment the time)
       std::transform(expectedMesh.begin(), expectedMesh.end(), expectedData.begin(), [&](double value) {

@@ -101,7 +101,7 @@ void WriteDataContext::resizeBufferTo(int nVertices, bool invalidateBufferedData
     _writeDataBuffer.values.tail(change).setZero();
   }
   if (invalidateBufferedData)
-    _writeDataBuffer.values.setConstant(-1);
+    _writeDataBuffer.values.setConstant(0);
 
   PRECICE_DEBUG("Data {} now has {} values", getDataName(), _writeDataBuffer.values.size());
 

@@ -63,8 +63,8 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
 
       // There is a duplicate write in the overlap region
       for (std::size_t i = 0; i < meshSize; ++i) {
-        auto start = time > 1 ? 10 : 10;
-        auto end   = time > 1 ? 31 : 31;
+        auto start = time > 1 ? 11 : 10;
+        auto end   = time > 1 ? 32 : 31;
         if (positions[i * dim] > start &&
             positions[i * dim] < end) {
           expectedData[i * dim] *= 2;
@@ -130,23 +130,6 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
       interface.readData(receivedMeshName, readDataName, receiveMeshIDs, dt, readData);
       BOOST_TEST(expectedData == readData, boost::test_tools::per_element());
 
-      // (artificial) solve: fill writeData
-      std::transform(expectedMesh.begin(), expectedMesh.end(), writeData.begin(), [&](double value) {
-        return value * value - value * time;
-      });
-
-      if (context.rank == 0) {
-        for (int i = 0; i < expectedMesh.size() / dim; ++i)
-          std::cout << "Writing: Rank 0: " << writeData[dim * i] << "  positions: " << expectedMesh[dim * i] << "  at time: " << time << std::endl;
-      }
-      if (context.rank == 1) {
-        for (int i = 0; i < expectedMesh.size() / dim; ++i)
-          std::cout << "Writing: Rank 1: " << writeData[dim * i] << "  positions: " << expectedMesh[dim * i] << "  at time: " << time << std::endl;
-      }
-
-      // write
-      interface.writeData(receivedMeshName, writeDataName, receiveMeshIDs, writeData);
-
       // we can't call this function in the first time step, see #2093
       if (time > 1) {
         interface.resetMeshAccessRegion(receivedMeshName);
@@ -166,19 +149,37 @@ BOOST_AUTO_TEST_CASE(ResetMeshAccessRegion)
 
         interface.setMeshAccessRegion(receivedMeshName, boundingBox);
       }
+
+      if (interface.reinitializeAPIAccess()) {
+        // After advance, we have the new vertices and IDs of the new access region
+        // First, check the sizes
+        receivedMeshSize = interface.getMeshVertexSize(receivedMeshName);
+        BOOST_TEST(receivedMeshSize == (expectedMesh.size() / dim));
+
+        // Resize vectors
+        receiveMeshIDs.resize(receivedMeshSize, -1);
+        receivedMesh = writeData = readData = expectedData = std::vector<double>(receivedMeshSize * dim, -1);
+        interface.getMeshVertexIDsAndCoordinates(receivedMeshName, receiveMeshIDs, receivedMesh);
+
+        BOOST_TEST(receivedMesh == expectedMesh, boost::test_tools::per_element());
+      }
+      // (artificial) solve: fill writeData
+      std::transform(expectedMesh.begin(), expectedMesh.end(), writeData.begin(), [&](double value) {
+        return value * value - value * time;
+      });
+
+      if (context.rank == 0) {
+        for (int i = 0; i < expectedMesh.size() / dim; ++i)
+          std::cout << "Writing: Rank 0: " << writeData[dim * i] << "  positions: " << expectedMesh[dim * i] << "  at time: " << time << std::endl;
+      }
+      if (context.rank == 1) {
+        for (int i = 0; i < expectedMesh.size() / dim; ++i)
+          std::cout << "Writing: Rank 1: " << writeData[dim * i] << "  positions: " << expectedMesh[dim * i] << "  at time: " << time << std::endl;
+      }
+
+      // write
+      interface.writeData(receivedMeshName, writeDataName, receiveMeshIDs, writeData);
       interface.advance(dt);
-
-      // After advance, we have the new vertices and IDs of the new access region
-      // First, check the sizes
-      receivedMeshSize = interface.getMeshVertexSize(receivedMeshName);
-      BOOST_TEST(receivedMeshSize == (expectedMesh.size() / dim));
-
-      // Resize vectors
-      receiveMeshIDs.resize(receivedMeshSize, -1);
-      receivedMesh = writeData = readData = expectedData = std::vector<double>(receivedMeshSize * dim, -1);
-      interface.getMeshVertexIDsAndCoordinates(receivedMeshName, receiveMeshIDs, receivedMesh);
-
-      BOOST_TEST(receivedMesh == expectedMesh, boost::test_tools::per_element());
 
       // the expected data lags one behind, so we generate (the same) reference solution as writeData for SolverOne, one dt later
       std::transform(expectedMesh.begin(), expectedMesh.end(), expectedData.begin(), [&](double value) {
