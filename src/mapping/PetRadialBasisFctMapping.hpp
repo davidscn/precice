@@ -637,11 +637,11 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time
 
     switch (solverResult) {
     case (petsc::KSPSolver::SolverResult::Converged):
-      PRECICE_DEBUG("The linear system of the RBF mapping from mesh {} to mesh {} converged. {}",
+      PRECICE_INFO("The linear system of the RBF mapping from mesh {} to mesh {} converged. {}",
                     this->input()->getName(), this->output()->getName(), _solver.summaryFor(in));
       break;
     case (petsc::KSPSolver::SolverResult::Stopped):
-      PRECICE_WARN("The linear system of the RBF mapping from mesh {} to mesh {} has not converged. "
+      PRECICE_INFO("The linear system of the RBF mapping from mesh {} to mesh {} has not converged. "
                    "This means most probably that the mapping problem is not well-posed or your relative tolerance is too conservative. "
                    "Please check if your coupling meshes are correct. "
                    "Maybe you need to fix axis-aligned mapping setups by marking perpendicular axes as dead? {}",
@@ -649,7 +649,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time
       break;
     case (petsc::KSPSolver::SolverResult::Diverged):
       KSPView(_solver, PETSC_VIEWER_STDOUT_WORLD);
-      PRECICE_ERROR("The linear system of the RBF mapping from mesh {} to mesh {} has diverged. "
+      PRECICE_INFO("The linear system of the RBF mapping from mesh {} to mesh {} has diverged. "
                     "This means most probably that the mapping problem is not well-posed. "
                     "Please check if your coupling meshes are correct. "
                     "Maybe you need to fix axis-aligned mapping setups by marking perpendicular axes as dead? {}",
