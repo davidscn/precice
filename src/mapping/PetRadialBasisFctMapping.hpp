@@ -245,6 +245,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   ePreCompute.stop();
 
   precice::profiling::Event eCreateMatrices("map.pet.createMatrices.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
+  precice::profiling::Event eCreateSystemMatrix("map.pet.createMatrices.assembleSystemMatrix", profiling::Synchronize);
 
   // Matrix C: Symmetric, sparse matrix with n x n local size.
   _matrixC.init(n, n, PETSC_DETERMINE, PETSC_DETERMINE, MATSBAIJ);
@@ -253,6 +254,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   CHKERRV(ierr);
   ierr = MatSetOption(_matrixC, MAT_SYMMETRY_ETERNAL, PETSC_TRUE);
   CHKERRV(ierr);
+  eCreateSystemMatrix.stop();
 
   // Matrix Q: Dense, holds the input mesh for the polynomial if set to SEPARATE. Zero size otherwise
   _matrixQ.init(n, PETSC_DETERMINE, PETSC_DETERMINE, sepPolyparams, MATDENSE);
@@ -261,11 +263,12 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   // Matrix V: Dense, holds the output mesh for polynomial if set to SEPARATE. Zero size otherwise
   _matrixV.init(outputSize, PETSC_DETERMINE, PETSC_DETERMINE, sepPolyparams, MATDENSE);
   PRECICE_DEBUG("Set matrix V to local size {} x {}", outputSize, sepPolyparams);
+  precice::profiling::Event eCreateOutputMatrix("map.pet.createMatrices.assembleOutputMatrix", profiling::Synchronize);
 
   // Matrix A: Sparse matrix with outputSize x n local size.
   _matrixA.init(outputSize, n, PETSC_DETERMINE, PETSC_DETERMINE, MATAIJ);
   PRECICE_DEBUG("Set matrix A to local size {} x {}", outputSize, n);
-
+  eCreateOutputMatrix.stop();
   eCreateMatrices.stop();
   precice::profiling::Event eAO("map.pet.AO.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
@@ -283,7 +286,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   // We do preallocating of the matrices C and A. That means we traverse the input data once, just
   // to know where we have entries in the sparse matrix. This information petsc can use to
   // preallocate the matrix. In the second phase we actually fill the matrix.
-
+  eCreateSystemMatrix.start();
   // Stores col -> value for each row;
   VertexData vertexData = bgPreallocationMatrixC(inMesh);
 
@@ -357,9 +360,11 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   // Begin assembly here, all assembly is ended at the end of this function.
   ierr = MatAssemblyBegin(_matrixC, MAT_FINAL_ASSEMBLY);
   CHKERRV(ierr);
+  eCreateSystemMatrix.stop();
   ierr = MatAssemblyBegin(_matrixQ, MAT_FINAL_ASSEMBLY);
   CHKERRV(ierr);
 
+  eCreateOutputMatrix.start();
   vertexData = bgPreallocationMatrixA(inMesh, outMesh);
 
   // holds the columns indices of the entries
@@ -415,6 +420,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
 
   ierr = MatAssemblyBegin(_matrixA, MAT_FINAL_ASSEMBLY);
   CHKERRV(ierr);
+  eCreateOutputMatrix.stop();
 
   ierr = MatAssemblyEnd(_matrixC, MAT_FINAL_ASSEMBLY);
   CHKERRV(ierr);
@@ -638,7 +644,7 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time
     switch (solverResult) {
     case (petsc::KSPSolver::SolverResult::Converged):
       PRECICE_INFO("The linear system of the RBF mapping from mesh {} to mesh {} converged. {}",
-                    this->input()->getName(), this->output()->getName(), _solver.summaryFor(in));
+                   this->input()->getName(), this->output()->getName(), _solver.summaryFor(in));
       break;
     case (petsc::KSPSolver::SolverResult::Stopped):
       PRECICE_INFO("The linear system of the RBF mapping from mesh {} to mesh {} has not converged. "
@@ -650,10 +656,10 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::mapConsistent(const time
     case (petsc::KSPSolver::SolverResult::Diverged):
       KSPView(_solver, PETSC_VIEWER_STDOUT_WORLD);
       PRECICE_INFO("The linear system of the RBF mapping from mesh {} to mesh {} has diverged. "
-                    "This means most probably that the mapping problem is not well-posed. "
-                    "Please check if your coupling meshes are correct. "
-                    "Maybe you need to fix axis-aligned mapping setups by marking perpendicular axes as dead? {}",
-                    this->input()->getName(), this->output()->getName(), _solver.summaryFor(in));
+                   "This means most probably that the mapping problem is not well-posed. "
+                   "Please check if your coupling meshes are correct. "
+                   "Maybe you need to fix axis-aligned mapping setups by marking perpendicular axes as dead? {}",
+                   this->input()->getName(), this->output()->getName(), _solver.summaryFor(in));
       break;
     }
 

@@ -165,6 +165,8 @@ template <typename RADIAL_BASIS_FUNCTION_T, typename IndexContainer>
 Eigen::MatrixXd buildMatrixCLU(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
                                std::array<bool, 3> activeAxis, Polynomial polynomial)
 {
+  precice::profiling::Event e{"map.rbf.assembleSystemMatrix"};
+
   // Treat the 2D case as 3D case with dead axis
   const unsigned int deadDimensions = std::count(activeAxis.begin(), activeAxis.end(), false);
   const unsigned int dimensions     = 3;
@@ -210,6 +212,8 @@ template <typename RADIAL_BASIS_FUNCTION_T, typename IndexContainer>
 Eigen::MatrixXd buildMatrixA(RADIAL_BASIS_FUNCTION_T basisFunction, const mesh::Mesh &inputMesh, const IndexContainer &inputIDs,
                              const mesh::Mesh &outputMesh, const IndexContainer outputIDs, std::array<bool, 3> activeAxis, Polynomial polynomial)
 {
+  precice::profiling::Event e{"map.rbf.assembleOutputMatrix"};
+
   // Treat the 2D case as 3D case with dead axis
   const unsigned int deadDimensions = std::count(activeAxis.begin(), activeAxis.end(), false);
   const unsigned int dimensions     = 3;
