@@ -416,11 +416,10 @@ void PetRadialBasisFctMapping<RADIAL_BASIS_FUNCTION_T>::computeMapping()
   eFillA.stop();
   // -- END FILL LOOP FOR MATRIX A --
 
-  precice::profiling::Event ePostFill("map.pet.postFill.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
-
   ierr = MatAssemblyBegin(_matrixA, MAT_FINAL_ASSEMBLY);
   CHKERRV(ierr);
   eCreateOutputMatrix.stop();
+  precice::profiling::Event ePostFill("map.pet.postFill.From" + this->input()->getName() + "To" + this->output()->getName(), profiling::Synchronize);
 
   ierr = MatAssemblyEnd(_matrixC, MAT_FINAL_ASSEMBLY);
   CHKERRV(ierr);
