@@ -31,11 +31,22 @@ void do_batched_assembly(int                                                    
                          EvalFunctionType                                                 f,
                          ::precice::mapping::RadialBasisParameters                        rbf_params,
                          const Kokkos::View<int *, MemorySpace>                          &inOffsets, // vertex offsets (length N+1)
-                         const Kokkos::View<double **, Kokkos::LayoutRight, MemorySpace> &inCoords,  // meshes
+                         const Kokkos::View<double *, MemorySpace> &inCoords,  // meshes
                          const Kokkos::View<int *, MemorySpace>                          &targetOffsets,
-                         const Kokkos::View<double **, Kokkos::LayoutRight, MemorySpace> &targetCoords,
+                         const Kokkos::View<double *, MemorySpace> &targetCoords,
                          const Kokkos::View<size_t *, MemorySpace>                       &matrixOffsets,
                          Kokkos::View<double *, MemorySpace>                              matrices);
+
+template <typename EvalFunctionType, typename MemorySpace>
+void do_input_assembly(
+   int                                                              N,   // Number of local systems
+   int                                                              dim, // Dimension of points
+   EvalFunctionType                                                 f,
+   ::precice::mapping::RadialBasisParameters                        rbf_params,
+   const Kokkos::View<int *, MemorySpace>                          &inOffsets, // vertex offsets (length N+1)
+   const Kokkos::View<double *, MemorySpace>                       &inCoords,  // meshes
+   const Kokkos::View<size_t *, MemorySpace>                       &matrixOffsets,
+   Kokkos::View<double *, MemorySpace>                              matrices); // 1D view of batched matrices
 
 template <typename MemorySpace>
 void do_batched_lu(
@@ -43,15 +54,18 @@ void do_batched_lu(
     const Kokkos::View<size_t *, MemorySpace> &matrixOffsets,
     Kokkos::View<double *, MemorySpace>        matrices);
 
-template <typename MemorySpace>
+template <typename EvalFunctionType, typename MemorySpace>
 void do_batched_solve(
     int                                        N,
+    int                                       dim, // Dimension of points
+    EvalFunctionType                          f,
+    ::precice::mapping::RadialBasisParameters rbf_params,
     const Kokkos::View<int *, MemorySpace>    &rhsOffsets,
     Kokkos::View<double *, MemorySpace>        rhs,
     const Kokkos::View<size_t *, MemorySpace> &matrixOffsets,
     const Kokkos::View<double *, MemorySpace> &matrices,
-    const Kokkos::View<size_t *, MemorySpace> &evalOffsets,
-    const Kokkos::View<double *, MemorySpace> &evalMat,
+    const Kokkos::View<double *, MemorySpace> &inCoords,  // meshes
+    const Kokkos::View<double *, MemorySpace> &targetCoords,
     const Kokkos::View<int *, MemorySpace>    &outOffsets,
     Kokkos::View<double *, MemorySpace>        out);
 

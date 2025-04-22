@@ -47,7 +47,7 @@ public:
 
   void clear();
 
-  void solveConsistent(const std::vector<SphericalVertexCluster<RBF_T>> &clusters,
+  void solveConsistent(RBF_T rbf, const std::vector<SphericalVertexCluster<RBF_T>> &clusters,
                        const Eigen::VectorXd &globalIn, Eigen::VectorXd &globalOut);
 
 private:
@@ -62,8 +62,8 @@ private:
   Kokkos::View<std::size_t *, Kokkos::DefaultExecutionSpace> _evaluationOffsets;
 
   // Essentially a MatrixXd, where the last index is contiguous in memory (important for the assembly kernel)
-  Kokkos::View<double **, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> _inMesh;
-  Kokkos::View<double **, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> _outMesh;
+  Kokkos::View<double *, Kokkos::DefaultExecutionSpace> _inMesh;
+  Kokkos::View<double *, Kokkos::DefaultExecutionSpace> _outMesh;
 
   Kokkos::View<double *, Kokkos::DefaultExecutionSpace> _kernelMatrices;
 
@@ -74,7 +74,7 @@ private:
   Kokkos::View<double *>::HostMirror                    _inDataMirror;
   Kokkos::View<double *, Kokkos::DefaultExecutionSpace> _outData;
   Kokkos::View<double *>::HostMirror                    _outDataMirror;
-
+int _dim =0;
   Polynomial _polynomial;
   // MappingConfiguration::GinkgoParameter _ginkgoParameter;
 };
@@ -152,34 +152,62 @@ BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::BatchedRBFSolver(RBF_T               
   precice::profiling::Event eMesh("map.pou.gpu.copyMeshes");
   // Step 3: Handle the mesh data structure and copy over to the device
   PRECICE_DEBUG("Computing mesh data on the device");
+  precice::profiling::Event eMeshAlloc("map.pou.gpu.copyMeshesAllocate");
   const auto dim = inMesh->getDimensions();
-  _inMesh        = Kokkos::View<double **, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace>("inMesh", hostIn(nCluster), dim);
-  _outMesh       = Kokkos::View<double **, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace>("outMesh", hostOut(nCluster), dim);
+  _dim = dim;
+  _inMesh        = Kokkos::View<double *, Kokkos::DefaultExecutionSpace>("inMesh", hostIn(nCluster)*dim);
+  _outMesh       = Kokkos::View<double *, Kokkos::DefaultExecutionSpace>("outMesh", hostOut(nCluster)*dim);
 
-  auto hostInMesh  = Kokkos::create_mirror_view(_inMesh);
-  auto hostOutMesh = Kokkos::create_mirror_view(_outMesh);
+  auto hostInMesh  = Kokkos::create_mirror(_inMesh);
+  auto hostOutMesh = Kokkos::create_mirror(_outMesh);
+  using MirrorSpace = typename decltype(hostOutMesh)::memory_space;
+  Kokkos::fence();
+
+  eMeshAlloc.stop();
+  precice::profiling::Event eMeshcompute("map.pou.gpu.copyMeshes.compute");
 
   Eigen::Index inIndex  = 0;
   Eigen::Index outIndex = 0;
   for (const auto &c : clusters) {
     const Eigen::MatrixXd Q = c.getLocalPolynomialInputMatrix(inMesh);
 
+    // Kokkos::View<double**,
+    // Kokkos::DefaultExecutionSpace::array_layout,
+    // Kokkos::HostSpace,
+    // Kokkos::MemoryTraits<Kokkos::Unmanaged>>
+
+    Kokkos::View<double**,
+    Kokkos::LayoutLeft,
+    Kokkos::HostSpace,
+    Kokkos::MemoryTraits<Kokkos::Unmanaged>>
+hostQ(&hostInMesh(inIndex*dim), dim, Q.rows());
+
     for (int i = 0; i < Q.rows(); ++i, ++inIndex) {
       for (int d = 0; d < dim; ++d) {
-        hostInMesh(inIndex, d) = Q(i, d + 1);
+        hostQ(d,i) = Q(i, d + 1);
       }
     }
 
     const Eigen::MatrixXd V = c.getLocalPolynomialOutputMatrix(outMesh);
     PRECICE_ASSERT(Q.cols() == V.cols());
 
+    // Kokkos::View<double**,
+    // Kokkos::DefaultExecutionSpace::array_layout,
+    // Kokkos::HostSpace,
+    // Kokkos::MemoryTraits<Kokkos::Unmanaged>>
+    Kokkos::View<double**,
+    Kokkos::LayoutLeft,
+    Kokkos::HostSpace,
+    Kokkos::MemoryTraits<Kokkos::Unmanaged>>
+    hostV(&hostOutMesh(outIndex * dim), dim, V.rows());
+
     for (int i = 0; i < V.rows(); ++i, ++outIndex) {
       for (int d = 0; d < dim; ++d) {
-        hostOutMesh(outIndex, d) = V(i, d + 1);
+        hostV(d, i) = V(i, d + 1);
       }
     }
   }
-
+  eMeshcompute.stop();
   // Copy to device
   Kokkos::deep_copy(_inMesh, hostInMesh);
   Kokkos::deep_copy(_outMesh, hostOutMesh);
@@ -193,17 +221,19 @@ BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::BatchedRBFSolver(RBF_T               
   Kokkos::deep_copy(unrolledSize, last_elem_view);
   _kernelMatrices = Kokkos::View<double *, Kokkos::DefaultExecutionSpace>("kernelMatrices", unrolledSize);
 
-  kernel::do_batched_assembly(nCluster, dim, basisFunction, basisFunction.getFunctionParameters(),
-                              _inOffsets, _inMesh, _inOffsets, _inMesh, _kernelOffsets, _kernelMatrices);
+  kernel::do_input_assembly(nCluster, dim, basisFunction, basisFunction.getFunctionParameters(),
+                              _inOffsets, _inMesh, _kernelOffsets, _kernelMatrices);
+  // kernel::do_batched_assembly(nCluster, dim, basisFunction, basisFunction.getFunctionParameters(),
+  //                             _inOffsets, _inMesh, _inOffsets, _inMesh, _kernelOffsets, _kernelMatrices);
 
   // The eval matrices ///////////////
-  std::size_t evalSize        = 0;
-  auto        last_elem_view2 = Kokkos::subview(_evaluationOffsets, nCluster);
-  Kokkos::deep_copy(evalSize, last_elem_view2);
-  _evalMatrices = Kokkos::View<double *, Kokkos::DefaultExecutionSpace>("evalMatrices", evalSize);
+  // std::size_t evalSize        = 0;
+  // auto        last_elem_view2 = Kokkos::subview(_evaluationOffsets, nCluster);
+  // Kokkos::deep_copy(evalSize, last_elem_view2);
+  // _evalMatrices = Kokkos::View<double *, Kokkos::DefaultExecutionSpace>("evalMatrices", evalSize);
 
-  kernel::do_batched_assembly(nCluster, dim, basisFunction, basisFunction.getFunctionParameters(),
-                              _inOffsets, _inMesh, _outOffsets, _outMesh, _evaluationOffsets, _evalMatrices);
+  // kernel::do_batched_assembly(nCluster, dim, basisFunction, basisFunction.getFunctionParameters(),
+  //                             _inOffsets, _inMesh, _outOffsets, _outMesh, _evaluationOffsets, _evalMatrices);
 
   Kokkos::fence();
   eMatr.stop();
@@ -225,7 +255,7 @@ BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::BatchedRBFSolver(RBF_T               
 }
 
 template <typename RADIAL_BASIS_FUNCTION_T>
-void BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(const std::vector<SphericalVertexCluster<RBF_T>> &clusters,
+void BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(RADIAL_BASIS_FUNCTION_T rbf, const std::vector<SphericalVertexCluster<RBF_T>> &clusters,
                                                                 const Eigen::VectorXd &globalIn, Eigen::VectorXd &globalOut)
 {
   precice::profiling::Event e("map.pou.gpu.preprocess");
@@ -245,9 +275,9 @@ void BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(const std::vecto
 
   // Step 3: Launch kernel
   precice::profiling::Event e2("map.pou.gpu.BatchedSolve");
-  kernel::do_batched_solve(clusters.size(),
+  kernel::do_batched_solve(clusters.size(), _dim,rbf, rbf.getFunctionParameters(),
                            _inOffsets, _inData, _kernelOffsets, _kernelMatrices,
-                           _evaluationOffsets, _evalMatrices, _outOffsets, _outData);
+                           _inMesh, _outMesh, _outOffsets, _outData);
 
   Kokkos::fence();
   e2.stop();

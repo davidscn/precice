@@ -143,6 +143,8 @@ constexpr void reduceActiveAxis(const mesh::Mesh &mesh, const IndexContainer &ID
 template <typename IndexContainer>
 inline void fillPolynomialEntries(Eigen::MatrixXd &matrix, const mesh::Mesh &mesh, const IndexContainer &IDs, Eigen::Index startIndex, std::array<bool, 3> activeAxis)
 {
+  precice::profiling::Event e1("map.rbf.fillPolynomialEntries");
+
   // Loop over all vertices in the mesh
   for (const auto &i : IDs | boost::adaptors::indexed()) {
 
@@ -385,6 +387,7 @@ RadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::RadialBasisFctSolver(RADIAL_BASIS
     // 4 = 1 + dimensions(3) = maximum number of polynomial parameters
     _localActiveAxis        = activeAxis;
     unsigned int polyParams = getNumberOfPolynomials();
+    precice::profiling::Event e("map.rbf.assembleandsvd");
 
     do {
       // First, build matrix Q and check for the condition number
@@ -410,6 +413,8 @@ RadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::RadialBasisFctSolver(RADIAL_BASIS
     // allocate and fill matrix V for the outputMesh
     _matrixV.resize(outputIDs.size(), polyParams);
     fillPolynomialEntries(_matrixV, outputMesh, outputIDs, 0, _localActiveAxis);
+    e.stop();
+    precice::profiling::Event e1("map.rbf.computePolynomialQR");
 
     // 3. compute decomposition
     _qrMatrixQ = _matrixQ.colPivHouseholderQr();
@@ -446,6 +451,7 @@ Eigen::VectorXd RadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::solveConservative
 template <typename RADIAL_BASIS_FUNCTION_T>
 void RadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistentPolynomial(Eigen::VectorXd &in, Eigen::VectorXd &out) const
 {
+  precice::profiling::Event e1("map.rbf.solveConsistentPolynomial");
   // assumes a separate polynomial
   PRECICE_ASSERT(_matrixQ.size() > 0);
   PRECICE_ASSERT(_matrixV.size() > 0);
