@@ -80,8 +80,10 @@ private:
   VectorView<> _outData;
   // Kokkos::View<double *>::HostMirror                    _outDataMirror;
 
-  int        _maxInClusterSize;
-  int        _maxOutClusterSize;
+  int _maxInClusterSize;
+  int _maxOutClusterSize;
+
+  RBF_T      _basisFunction;
   Polynomial _polynomial;
   const int  _nCluster;
   const int  _dim; // Mesh dimension
@@ -97,7 +99,7 @@ BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::BatchedRBFSolver(RBF_T               
                                                             double                                clusterRadius,
                                                             Polynomial                            polynomial,
                                                             MappingConfiguration::GinkgoParameter ginkgoParameter)
-    : _polynomial(polynomial), _nCluster(static_cast<int>(centers.size())), _dim(inMesh->getDimensions())
+    : _basisFunction(basisFunction), _polynomial(polynomial), _nCluster(static_cast<int>(centers.size())), _dim(inMesh->getDimensions())
 {
   PRECICE_TRACE();
   PRECICE_CHECK(_polynomial != Polynomial::ON, "Setting polynomial to \"on\" for the mapping between \"{}\" and \"{}\" is not supported", inMesh->getName(), outMesh->getName());
@@ -347,12 +349,12 @@ void BatchedRBFSolver<RADIAL_BASIS_FUNCTION_T>::solveConsistent(const time::Samp
   // Step 2: Launch kernel
   precice::profiling::Event e3("map.pou.gpu.BatchedSolve");
   if (_polynomial == Polynomial::SEPARATE) {
-    kernel::do_batched_solve<true>(_nCluster, _dim, _avgClusterSize, _maxInClusterSize, _maxOutClusterSize,
+    kernel::do_batched_solve<true>(_nCluster, _dim, _avgClusterSize, _maxInClusterSize, _maxOutClusterSize, _basisFunction,
                                    _inOffsets, _globalInIDs, _inData, _kernelOffsets, _kernelMatrices, _normalizedWeights,
                                    _evaluationOffsets, _evalMatrices, _outOffsets, _globalOutIDs, _outData,
                                    _inMesh, _outMesh, _qrMatrix, _qrTau, _qrP);
   } else {
-    kernel::do_batched_solve<false>(_nCluster, _dim, _avgClusterSize, _maxInClusterSize, _maxOutClusterSize,
+    kernel::do_batched_solve<false>(_nCluster, _dim, _avgClusterSize, _maxInClusterSize, _maxOutClusterSize, _basisFunction,
                                     _inOffsets, _globalInIDs, _inData, _kernelOffsets, _kernelMatrices, _normalizedWeights,
                                     _evaluationOffsets, _evalMatrices, _outOffsets, _globalOutIDs, _outData,
                                     _inMesh, _outMesh, _qrMatrix, _qrTau, _qrP);

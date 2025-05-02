@@ -463,13 +463,14 @@ void do_batched_lu(
   Kokkos::parallel_for("do_batched_lu", TeamPolicy(nCluster, Kokkos::AUTO), kernel);
 }
 
-template <bool polynomial, typename MemorySpace>
+template <bool polynomial, typename EvalFunctionType, typename MemorySpace>
 void do_batched_solve(
     int                                  nCluster,
     int                                  dim,
     int                                  avgInClusterSize,
     int                                  maxInClusterSize,
     int                                  maxOutClusterSize,
+    EvalFunctionType                     f,
     const VectorOffsetView<MemorySpace> &rhsOffsets,
     const GlobalIDView<MemorySpace>     &globalRhsIDs,
     VectorView<MemorySpace>              rhs,
@@ -499,6 +500,7 @@ void do_batched_solve(
   using ScratchVector = Kokkos::View<double *, ScratchSpace, UnmanagedMemory>;
   using ScratchMatrix = std::conditional_t<polynomial, ScratchView4d, ScratchView1d>;
 
+  const auto rbf_params = f.getFunctionParameters();
   // We define the lambda here such that we can query the recommended team size from Kokkos
   // Launch policy is then handled below
   auto kernel = KOKKOS_LAMBDA(const MemberType &team)
@@ -532,7 +534,9 @@ void do_batched_solve(
     team.team_barrier();
 
     Kokkos::Array<double, 4> qrCoeffs = {0., 0., 0., 0.};
-
+    // Caution, this vector uses memory we later use as tmp, we have to declare it here outsie the if
+    // to be able to use it further down then
+    Kokkos::View<double **, Kokkos::LayoutRight, ScratchSpace, UnmanagedMemory> localInMesh(&work(inSize, 1), inSize, dim);
     // Step 3: Solve the polynomial QR system, if we have one
     if constexpr (polynomial) {
 
@@ -595,23 +599,25 @@ void do_batched_solve(
       for (int i = (matrixCols - 1); i >= 0; --i) {
         Kokkos::kokkos_swap(qrCoeffs[i], qrCoeffs[i + P(i)]);
       }
-
-      // Step 3g: Subtract polynomial portion from the input data: in -= Q * p
-      // threading over inSize
-      Kokkos::parallel_for(
-          Kokkos::TeamThreadRange(team, inSize),
-          [&](int i) {
-            auto globalID = globalRhsIDs(i + inBegin);
-            // The "1"/constant term is the last value in the result
-            // dim is here matrixCols - 1
-            double sum = qrCoeffs[dim];
-            // ... and the linear polynomial
-            for (int d = 0; d < dim; ++d)
-              sum += inMesh(globalID, d) * qrCoeffs[d];
-            in(i) -= sum;
-          });
-      team.team_barrier();
     }
+    // Step 3g: Subtract polynomial portion from the input data: in -= Q * p
+    // threading over inSize
+    Kokkos::parallel_for(
+        Kokkos::TeamThreadRange(team, inSize),
+        [&](int i) {
+          auto globalID = globalRhsIDs(i + inBegin);
+          // The "1"/constant term is the last value in the result
+          // dim is here matrixCols - 1
+          double sum = qrCoeffs[dim];
+          // ... and the linear polynomial
+          for (int d = 0; d < dim; ++d) {
+            sum += inMesh(globalID, d) * qrCoeffs[d];
+            // Put it in shared memory as we later need it in the output evaluation
+            localInMesh(i, d) = inMesh(globalID, d);
+          }
+          in(i) -= sum;
+        });
+    team.team_barrier();
 
     // Step 4: Solve the LU decomposition
     // The lu inplace lu decomposition computed with KokkosBatched
@@ -642,43 +648,87 @@ void do_batched_solve(
     team.team_barrier();
 
     // Step 5: Allocate and zero out a local result vector (more of a safety feature)
-    ScratchVector res(team.team_scratch(1), outSize);
-    Kokkos::parallel_for(
-        Kokkos::TeamThreadRange(team, outSize),
-        [&](int i) { res(i) = 0; });
-    team.team_barrier();
+    constexpr bool merged_evaluation = true;
+    if constexpr (!merged_evaluation) {
+      ScratchVector res(team.team_scratch(1), outSize);
+      Kokkos::parallel_for(
+          Kokkos::TeamThreadRange(team, outSize),
+          [&](int i) { res(i) = 0; });
+      team.team_barrier();
 
-    // Step 6: Multiply by the evaluation operator
-    // the evaluation matrix
-    auto                     startEval = evalOffsets(batch);
-    BatchMatrix<MemorySpace> eval(&evalMat(startEval), outSize, inSize);
+      // Step 6: Multiply by the evaluation operator
+      // the evaluation matrix
+      auto                     startEval = evalOffsets(batch);
+      BatchMatrix<MemorySpace> eval(&evalMat(startEval), outSize, inSize);
+      // res := 1.0 * eval * b + 0.0 * res
+      KokkosBlas::Experimental::Gemv<
+          KokkosBlas::Mode::Team,
+          KokkosBlas::Algo::Gemv::Blocked>::invoke(team, 'N', 1.0, eval, in, 0.0, res);
 
-    // res := 1.0 * eval * b + 0.0 * res
-    KokkosBlas::Experimental::Gemv<
-        KokkosBlas::Mode::Team,
-        KokkosBlas::Algo::Gemv::Blocked>::invoke(team, 'N', 1.0, eval, in, 0.0, res);
+      team.team_barrier();
 
-    team.team_barrier();
-
-    // Step 7: write the result back to the global vector
-    Kokkos::parallel_for(
-        Kokkos::TeamThreadRange(team, outSize),
-        [&](int i) {
-          auto   globalID = globalOutIDs(i + outBegin);
-          double sum      = res(i);
-          // Add polynomial portion to the output data: out += V * p
-          if constexpr (polynomial) {
-            // The "1"/constant term is the last value in the result
-            // dim is here matrixCols - 1
-            sum += qrCoeffs[dim];
-            // ... and the linear polynomial
-            for (int d = 0; d < dim; ++d) {
-              sum += outMesh(globalID, d) * qrCoeffs[d];
+      // Step 7: write the result back to the global vector
+      Kokkos::parallel_for(
+          Kokkos::TeamThreadRange(team, outSize),
+          [&](int i) {
+            auto   globalID = globalOutIDs(i + outBegin);
+            double sum      = res(i);
+            // Add polynomial portion to the output data: out += V * p
+            if constexpr (polynomial) {
+              // The "1"/constant term is the last value in the result
+              // dim is here matrixCols - 1
+              sum += qrCoeffs[dim];
+              // ... and the linear polynomial
+              for (int d = 0; d < dim; ++d) {
+                sum += outMesh(globalID, d) * qrCoeffs[d];
+              }
             }
-          }
-          auto w = normalizedWeights(i + outBegin);
-          Kokkos::atomic_add(&out(globalID), sum * w);
-        }); // TeamThreadRange
+            auto w = normalizedWeights(i + outBegin);
+            Kokkos::atomic_add(&out(globalID), sum * w);
+          }); // TeamThreadRange
+    } else {
+      // Alternative approach: do all in one go:
+      Kokkos::parallel_for(
+          Kokkos::TeamThreadRange(team, outSize), [&](int r) {
+            auto globalID = globalOutIDs(r + outBegin);
+
+            Kokkos::Array<double, 3> outVertex = {0., 0., 0.};
+            for (int d = 0; d < dim; ++d) {
+              outVertex[d] = outMesh(globalID, d);
+            }
+
+            // Accumulate partial dot product in a thread-parallel manner
+            double sum = 0.0;
+            Kokkos::parallel_reduce(
+                Kokkos::ThreadVectorRange(team, inSize),
+                [&](int c, double &localSum) {
+                  double dist = 0;
+                  for (int d = 0; d < dim; ++d) {
+                    // double diff = inMesh(c, d) - outMesh(r, d);
+                    double diff = outVertex[d] - localInMesh(c, d);
+                    dist += diff * diff;
+                  }
+                  dist = Kokkos::sqrt(dist);
+                  // 2) Evaluate your RBF or similar function
+                  double val = f(dist, rbf_params);
+                  localSum += val * in(c);
+                },
+                sum); // ThreadVectorRange
+
+            if constexpr (polynomial) {
+              // The "1"/constant term is the last value in the result
+              // dim is here matrixCols - 1
+              sum += qrCoeffs[dim];
+              // ... and the linear polynomial
+              for (int d = 0; d < dim; ++d) {
+                sum += outVertex[d] * qrCoeffs[d];
+              }
+            }
+            // Store final dot product for row r
+            auto w = normalizedWeights(r + outBegin);
+            Kokkos::atomic_add(&out(globalID), sum * w);
+          }); // End TeamThreadRange
+    } // end if-merged-evaluation
     // End Team parallel loop
   };
 
