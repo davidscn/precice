@@ -21,9 +21,9 @@ BOOST_AUTO_TEST_CASE(testInitialize)
   BOOST_TEST(storage.nDofs() == nValues);
   BOOST_TEST(storage.nTimes() == 1);
   for (int i = 0; i < nValues; i++) {
-    BOOST_TEST(storage.getSampleAtOrAfter(0).values(i) == 1);
-    BOOST_TEST(storage.getSampleAtOrAfter(0.5).values(i) == 1);
-    BOOST_TEST(storage.getSampleAtOrAfter(1).values(i) == 1);
+    BOOST_TEST(storage.getStampleAtOrAfter(0).sample.values(i) == 1);
+    BOOST_TEST(storage.getStampleAtOrAfter(0.5).sample.values(i) == 1);
+    BOOST_TEST(storage.getStampleAtOrAfter(1).sample.values(i) == 1);
   }
 }
 
@@ -68,17 +68,17 @@ BOOST_AUTO_TEST_CASE(testMove)
   BOOST_TEST(storage.nTimes() == 3);
   BOOST_TEST(storage.maxStoredTime() == 1.0);
   for (int i = 0; i < nValues; i++) {
-    BOOST_TEST(storage.getSampleAtOrAfter(0).values(i) == 1);
-    BOOST_TEST(storage.getSampleAtOrAfter(0.5).values(i) == 1);
-    BOOST_TEST(storage.getSampleAtOrAfter(1).values(i) == 0);
+    BOOST_TEST(storage.getStampleAtOrAfter(0).sample.values(i) == 1);
+    BOOST_TEST(storage.getStampleAtOrAfter(0.5).sample.values(i) == 1);
+    BOOST_TEST(storage.getStampleAtOrAfter(1).sample.values(i) == 0);
   }
   storage.move();
   BOOST_TEST(storage.nDofs() == nValues);
   BOOST_TEST(storage.nTimes() == 1);
   BOOST_TEST(storage.maxStoredTime() == 1.0);
   for (int i = 0; i < nValues; i++) {
-    BOOST_TEST(storage.getSampleAtOrAfter(0).values(i) == 0);
-    BOOST_TEST(storage.getSampleAtOrAfter(1).values(i) == 0);
+    BOOST_TEST(storage.getStampleAtOrAfter(0).sample.values(i) == 0);
+    BOOST_TEST(storage.getStampleAtOrAfter(1).sample.values(i) == 0);
   }
 }
 

@@ -27,4 +27,9 @@ SampleResult Waveform::sample(double time) const
 {
   return _timeStepsStorage.sample(time);
 }
+
+const Stample &Waveform::getDegreeZeroStample(double time) const
+{
+  return _timeStepsStorage.getDegreeZeroStample(time);
+}
 } // namespace precice::time

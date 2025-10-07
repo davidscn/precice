@@ -45,6 +45,11 @@ const time::Sample &Data::sample() const
   return _sample;
 }
 
+const time::Stample &Data::getDegreeZeroStample(double time) const
+{
+  return _waveform.getDegreeZeroStample(time);
+}
+
 time::SampleResult Data::sampleAtTime(double time) const
 {
   return _waveform.sample(time);

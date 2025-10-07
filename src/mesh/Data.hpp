@@ -97,6 +97,8 @@ public:
   /// Add sample at given time to _timeStepsStorage.
   void setSampleAtTime(double time, const time::Sample &sample);
 
+  const time::Stample &getDegreeZeroStample(double time) const;
+
   /// Set _sample
   void setGlobalSample(const time::Sample &sample); // @todo try to remove this function
 

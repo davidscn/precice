@@ -62,14 +62,16 @@ public:
   double maxStoredTime() const;
 
   /**
-   * @brief Returns the Sample at time following "before" contained in this Storage.
+   * @brief Returns the Stample at time following "before" contained in this Storage.
    *
    * The stored normalized dt is larger or equal than "before". If "before" is a normalized dt stored in this Storage, this function returns the Sample at "before"
    *
    * @param before a double, where we want to find a normalized dt that comes directly after this one
-   * @return Sample in this Storage at or directly after "before"
+   * @return Stample in this Storage at or directly after "before"
    */
-  const Sample &getSampleAtOrAfter(double before) const;
+  const Stample &getStampleAtOrAfter(double before) const;
+
+  const Stample &getDegreeZeroStample(double time) const;
 
   /**
    * @brief Returns the last Sample contained in this Storage.

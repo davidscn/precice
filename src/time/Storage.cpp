@@ -152,15 +152,15 @@ void Storage::trimAfter(double time)
   _bspline.reset();
 }
 
-const Sample &Storage::getSampleAtOrAfter(double before) const
+const Stample &Storage::getStampleAtOrAfter(double before) const
 {
   PRECICE_TRACE(before);
   if (nTimes() == 1) {
-    return _stampleStorage.front().sample; // @todo in this case the name getSampleAtOrAfter does not fit, because _stampleStorage.front().sample is returned for any time before.
+    return _stampleStorage.front(); // @todo in this case the name getStampleAtOrAfter does not fit, because _stampleStorage.front().sample is returned for any time before.
   } else {
     auto stample = std::find_if(_stampleStorage.begin(), _stampleStorage.end(), [&before](const auto &s) { return math::greaterEquals(s.timestamp, before); });
     PRECICE_ASSERT(stample != _stampleStorage.end(), "no values found!");
-    return stample->sample;
+    return *stample;
   }
 }
 
@@ -195,13 +195,18 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> Storage::getTimesAndValues() const
   return std::make_pair(times, values);
 }
 
+const Stample &Storage::getDegreeZeroStample(double time) const
+{
+  return this->getStampleAtOrAfter(time);
+}
+
 SampleResult Storage::sample(double time) const
 {
   PRECICE_ASSERT(this->nTimes() != 0, "There are no samples available");
   const int usedDegree = computeUsedDegree(_degree, nTimes());
 
   if (usedDegree == 0) {
-    return this->getSampleAtOrAfter(time).values;
+    return this->getStampleAtOrAfter(time).sample.values;
   }
 
   PRECICE_ASSERT(usedDegree >= 1);
@@ -230,11 +235,11 @@ Eigen::MatrixXd Storage::sampleGradients(double time) const
   const int usedDegree = computeUsedDegree(_degree, nTimes());
 
   if (usedDegree == 0) {
-    return this->getSampleAtOrAfter(time).gradients;
+    return this->getStampleAtOrAfter(time).sample.gradients;
   }
 
   PRECICE_WARN("You specified interpolation degree of {}, but only degree 0 is supported for gradient interpolation", usedDegree); // @todo implement this like for sampleAt
-  return this->getSampleAtOrAfter(time).gradients;
+  return this->getStampleAtOrAfter(time).sample.gradients;
 }
 
 int Storage::computeUsedDegree(int requestedDegree, int numberOfAvailableSamples) const

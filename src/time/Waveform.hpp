@@ -54,6 +54,8 @@ public:
    */
   SampleResult sample(const double time) const;
 
+  const Stample &getDegreeZeroStample(double time) const;
+
 private:
   /// Stores time steps in the current time window
   time::Storage _timeStepsStorage;

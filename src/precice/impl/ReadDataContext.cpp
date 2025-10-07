@@ -48,8 +48,17 @@ void ReadDataContext::mapAndReadValues(::precice::span<const double> coordinates
 
   // First, check if we have the current readTime already in our MappingDataCache
   if (!mappingCache->hasDataAtTimeStamp(readTime)) {
-    // if not, sample our waveform and update the cache
-    justInTimeMapping->updateMappingDataCache(*mappingCache.get(), _providedData->sampleAtTime(readTime).values());
+    // if time interpolation is switched-off, it might be that we dont need to update either
+    if (_providedData->getWaveformDegree() == 0) {
+      const auto &stample = _providedData->getDegreeZeroStample(readTime);
+      // if not, sample our waveform and update the cache
+      readTime = stample.timestamp;
+      if (!mappingCache->hasDataAtTimeStamp(readTime))
+        justInTimeMapping->updateMappingDataCache(*mappingCache.get(), stample.sample.values);
+    } else {
+      // if not, sample our waveform and update the cache
+      justInTimeMapping->updateMappingDataCache(*mappingCache.get(), _providedData->sampleAtTime(readTime).values());
+    }
     mappingCache->setTimeStamp(readTime);
   }
   // Now we are certain that our cache contains the data at readTime
